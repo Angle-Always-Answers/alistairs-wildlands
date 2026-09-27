@@ -2,6 +2,7 @@
 const canvas = document.querySelector('#game');
 const ctx = canvas.getContext('2d');
 const overlay = document.querySelector('#overlay');
+const mobileHud = document.querySelector('#mobile-hud');
 const W = 1100, H = 700, LEVEL_LENGTH = 4800, WORLD = LEVEL_LENGTH * 3, FLOOR = 570;
 const keys = new Set();
 const mouse = {x:600, y:300, down:false};
@@ -492,6 +493,7 @@ function draw() {
   for(const l of labels){ctx.globalAlpha=Math.min(1,l.life);text(l.text,l.x,l.y,14,l.color);}ctx.globalAlpha=1;
   if(training){text('TRAINING TARGETS',545,FLOOR-68,12,'#ffe8ae');}
   ctx.restore();drawHUD();
+  if(mobileHud)mobileHud.textContent=`♥ ${player.hp}   ${weapons[player.weapon].name}   ${player.ammo} ammo   ${player.potions} potions`;
 }
 function pause() {
   if(state==='play'){state='pause';overlay.innerHTML='<small>TAKE A BREATHER</small><h2>Adventure paused.</h2><p>Press P or click below to continue.</p><button id="resume">Keep exploring →</button>';overlay.classList.remove('hidden');document.querySelector('#resume').onclick=pause;}
