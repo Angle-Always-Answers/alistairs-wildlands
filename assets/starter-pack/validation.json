@@ -1,0 +1,162 @@
+[
+  {
+    "file": "ammo.png",
+    "width": 32,
+    "height": 32,
+    "format": "Format32bppArgb",
+    "transparentSamples": 24,
+    "visibleSamples": 97
+  },
+  {
+    "file": "atlas-source.png",
+    "width": 1254,
+    "height": 1254,
+    "format": "Format32bppArgb",
+    "transparentSamples": 118730,
+    "visibleSamples": 55994
+  },
+  {
+    "file": "axe.png",
+    "width": 64,
+    "height": 40,
+    "format": "Format32bppArgb",
+    "transparentSamples": 180,
+    "visibleSamples": 128
+  },
+  {
+    "file": "background-pine.png",
+    "width": 112,
+    "height": 144,
+    "format": "Format32bppArgb",
+    "transparentSamples": 792,
+    "visibleSamples": 1032
+  },
+  {
+    "file": "bat.png",
+    "width": 64,
+    "height": 40,
+    "format": "Format32bppArgb",
+    "transparentSamples": 154,
+    "visibleSamples": 154
+  },
+  {
+    "file": "contact-sheet.png",
+    "width": 800,
+    "height": 760,
+    "format": "Format32bppArgb",
+    "transparentSamples": 0,
+    "visibleSamples": 67818
+  },
+  {
+    "file": "grass-dirt.png",
+    "width": 48,
+    "height": 48,
+    "format": "Format32bppArgb",
+    "transparentSamples": 33,
+    "visibleSamples": 223
+  },
+  {
+    "file": "hammer.png",
+    "width": 64,
+    "height": 40,
+    "format": "Format32bppArgb",
+    "transparentSamples": 185,
+    "visibleSamples": 123
+  },
+  {
+    "file": "machine-gun.png",
+    "width": 64,
+    "height": 32,
+    "format": "Format32bppArgb",
+    "transparentSamples": 113,
+    "visibleSamples": 129
+  },
+  {
+    "file": "pistol.png",
+    "width": 48,
+    "height": 32,
+    "format": "Format32bppArgb",
+    "transparentSamples": 108,
+    "visibleSamples": 68
+  },
+  {
+    "file": "player-animation-source.png",
+    "width": 1254,
+    "height": 1254,
+    "format": "Format32bppArgb",
+    "transparentSamples": 106085,
+    "visibleSamples": 68639
+  },
+  {
+    "file": "player-animations.png",
+    "width": 384,
+    "height": 320,
+    "format": "Format32bppArgb",
+    "transparentSamples": 11468,
+    "visibleSamples": 2228
+  },
+  {
+    "file": "player-idle.png",
+    "width": 40,
+    "height": 56,
+    "format": "Format32bppArgb",
+    "transparentSamples": 118,
+    "visibleSamples": 148
+  },
+  {
+    "file": "potion.png",
+    "width": 24,
+    "height": 32,
+    "format": "Format32bppArgb",
+    "transparentSamples": 28,
+    "visibleSamples": 60
+  },
+  {
+    "file": "shotgun.png",
+    "width": 64,
+    "height": 24,
+    "format": "Format32bppArgb",
+    "transparentSamples": 84,
+    "visibleSamples": 92
+  },
+  {
+    "file": "single-shot.png",
+    "width": 72,
+    "height": 24,
+    "format": "Format32bppArgb",
+    "transparentSamples": 111,
+    "visibleSamples": 81
+  },
+  {
+    "file": "slime.png",
+    "width": 48,
+    "height": 32,
+    "format": "Format32bppArgb",
+    "transparentSamples": 62,
+    "visibleSamples": 114
+  },
+  {
+    "file": "sword.png",
+    "width": 64,
+    "height": 24,
+    "format": "Format32bppArgb",
+    "transparentSamples": 105,
+    "visibleSamples": 71
+  },
+  {
+    "file": "training-dummy.png",
+    "width": 48,
+    "height": 64,
+    "format": "Format32bppArgb",
+    "transparentSamples": 192,
+    "visibleSamples": 160
+  },
+  {
+    "file": "woodland-tree.png",
+    "width": 128,
+    "height": 144,
+    "format": "Format32bppArgb",
+    "transparentSamples": 717,
+    "visibleSamples": 1347
+  }
+]

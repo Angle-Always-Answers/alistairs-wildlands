@@ -1,0 +1,77 @@
+{
+  "image": "player-animations.png",
+  "animations": {
+    "hammer": {
+      "durationsMs": [
+        120,
+        180,
+        150,
+        200
+      ],
+      "frames": [
+        12,
+        13,
+        14,
+        15
+      ],
+      "loop": false
+    },
+    "sword": {
+      "durationsMs": [
+        65,
+        65,
+        75,
+        65
+      ],
+      "frames": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "loop": false
+    },
+    "run": {
+      "frames": [
+        2,
+        3
+      ],
+      "loop": true,
+      "fps": 9
+    },
+    "axe": {
+      "durationsMs": [
+        120,
+        85,
+        100,
+        125
+      ],
+      "frames": [
+        8,
+        9,
+        10,
+        11
+      ],
+      "loop": false
+    },
+    "idle": {
+      "frames": [
+        0,
+        1
+      ],
+      "loop": true,
+      "fps": 3
+    }
+  },
+  "height": 320,
+  "columns": 4,
+  "weaponsBakedIntoAttackFrames": true,
+  "anchor": [
+    48,
+    70
+  ],
+  "facing": "right",
+  "frameHeight": 80,
+  "width": 384,
+  "frameWidth": 96
+}

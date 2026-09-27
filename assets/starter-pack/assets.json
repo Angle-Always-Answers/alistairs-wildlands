@@ -1,0 +1,258 @@
+[
+  {
+    "name": "player-idle",
+    "file": "player-idle.png",
+    "width": 40,
+    "height": 56,
+    "anchor": [
+      20,
+      55
+    ],
+    "sourceRect": [
+      64,
+      98,
+      170,
+      285
+    ]
+  },
+  {
+    "name": "slime",
+    "file": "slime.png",
+    "width": 48,
+    "height": 32,
+    "anchor": [
+      24,
+      31
+    ],
+    "sourceRect": [
+      347,
+      223,
+      252,
+      156
+    ]
+  },
+  {
+    "name": "bat",
+    "file": "bat.png",
+    "width": 64,
+    "height": 40,
+    "anchor": [
+      32,
+      39
+    ],
+    "sourceRect": [
+      647,
+      143,
+      305,
+      185
+    ]
+  },
+  {
+    "name": "training-dummy",
+    "file": "training-dummy.png",
+    "width": 48,
+    "height": 64,
+    "anchor": [
+      24,
+      63
+    ],
+    "sourceRect": [
+      1004,
+      83,
+      183,
+      300
+    ]
+  },
+  {
+    "name": "sword",
+    "file": "sword.png",
+    "width": 64,
+    "height": 24,
+    "anchor": [
+      32,
+      23
+    ],
+    "sourceRect": [
+      32,
+      486,
+      285,
+      108
+    ]
+  },
+  {
+    "name": "pistol",
+    "file": "pistol.png",
+    "width": 48,
+    "height": 32,
+    "anchor": [
+      24,
+      31
+    ],
+    "sourceRect": [
+      360,
+      491,
+      236,
+      110
+    ]
+  },
+  {
+    "name": "hammer",
+    "file": "hammer.png",
+    "width": 64,
+    "height": 40,
+    "anchor": [
+      32,
+      39
+    ],
+    "sourceRect": [
+      658,
+      452,
+      257,
+      167
+    ]
+  },
+  {
+    "name": "axe",
+    "file": "axe.png",
+    "width": 64,
+    "height": 40,
+    "anchor": [
+      32,
+      39
+    ],
+    "sourceRect": [
+      966,
+      474,
+      261,
+      155
+    ]
+  },
+  {
+    "name": "machine-gun",
+    "file": "machine-gun.png",
+    "width": 64,
+    "height": 32,
+    "anchor": [
+      32,
+      31
+    ],
+    "sourceRect": [
+      27,
+      724,
+      298,
+      124
+    ]
+  },
+  {
+    "name": "shotgun",
+    "file": "shotgun.png",
+    "width": 64,
+    "height": 24,
+    "anchor": [
+      32,
+      23
+    ],
+    "sourceRect": [
+      344,
+      735,
+      270,
+      88
+    ]
+  },
+  {
+    "name": "single-shot",
+    "file": "single-shot.png",
+    "width": 72,
+    "height": 24,
+    "anchor": [
+      36,
+      23
+    ],
+    "sourceRect": [
+      648,
+      729,
+      344,
+      101
+    ]
+  },
+  {
+    "name": "potion",
+    "file": "potion.png",
+    "width": 24,
+    "height": 32,
+    "anchor": [
+      12,
+      31
+    ],
+    "sourceRect": [
+      1055,
+      708,
+      103,
+      146
+    ]
+  },
+  {
+    "name": "ammo",
+    "file": "ammo.png",
+    "width": 32,
+    "height": 32,
+    "anchor": [
+      16,
+      31
+    ],
+    "sourceRect": [
+      86,
+      977,
+      171,
+      164
+    ]
+  },
+  {
+    "name": "grass-dirt",
+    "file": "grass-dirt.png",
+    "width": 48,
+    "height": 48,
+    "anchor": [
+      24,
+      47
+    ],
+    "sourceRect": [
+      366,
+      949,
+      212,
+      211
+    ]
+  },
+  {
+    "name": "woodland-tree",
+    "file": "woodland-tree.png",
+    "width": 128,
+    "height": 144,
+    "anchor": [
+      64,
+      143
+    ],
+    "sourceRect": [
+      642,
+      894,
+      298,
+      309
+    ]
+  },
+  {
+    "name": "background-pine",
+    "file": "background-pine.png",
+    "width": 112,
+    "height": 144,
+    "anchor": [
+      56,
+      143
+    ],
+    "sourceRect": [
+      985,
+      900,
+      237,
+      304
+    ]
+  }
+]
