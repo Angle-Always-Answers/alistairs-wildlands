@@ -6,7 +6,8 @@ const mobileHud = document.querySelector('#mobile-hud');
 const W = 1100, H = 700, LEVEL_LENGTH = 4800, WORLD = LEVEL_LENGTH * 3, FLOOR = 570;
 const keys = new Set();
 const mouse = {x:600, y:300, down:false};
-let activeAimPointer=null,mobileAim=null;
+let activeAimPointer=null,mobileAim=null,canvasTouch=null;
+const touchGestures=new Map();
 const weapons = [
   {name:'RUSTY SWORD', damage:18, range:108, cool:.52, duration:.38, kind:'thrust', color:'#c7edf0', tip:'Starter sword · 18 damage. Find upgrades in the levels.'},
   {name:'PISTOL', damage:30, cool:.48, spread:0, gun:true, color:'#f6d086', tip:'Slow and perfectly accurate'},
@@ -78,7 +79,7 @@ function reset() {
   ];
   // Loaner gear must be picked up in camp and stays there when the map opens.
   trainingLoot=[1,3,4,5,6,2].map((weapon,i)=>({x:290+i*115,y:FLOOR-28,type:'weapon',weapon}));
-  keys.clear();mouse.down=false;activeAimPointer=null;mobileAim=null;
+  keys.clear();mouse.down=false;activeAimPointer=null;mobileAim=null;canvasTouch=null;touchGestures.clear();
 }
 function start() {reset();state='play';overlay.classList.add('hidden');canvas.focus();}
 function beginAdventure() {
@@ -88,7 +89,7 @@ function beginAdventure() {
   stage=0;region=0;camera=0;showMap();
 }
 function showMap() {
-  state='map';keys.clear();mouse.down=false;activeAimPointer=null;mobileAim=null;
+  state='map';keys.clear();mouse.down=false;activeAimPointer=null;mobileAim=null;canvasTouch=null;touchGestures.clear();
   overlay.innerHTML=`<small>THE WILDLANDS MAP</small><h2>Choose your next journey.</h2><p>Each land has its own monsters, hazards, rewards, and exit gate. Gear found in levels carries forward; camp gear is for practice.</p><div class="map-stages">${biomes.map((b,i)=>`<button class="map-stage" data-stage="${i}" ${i>unlockedStage?'disabled':''}><strong>${i+1}. ${b.name}</strong><span>${completed[i]?'✓ CLEARED':i>unlockedStage?'LOCKED':`DEFEAT ${b.goal} MONSTERS${i===2?' + BOSS':''}`}</span><em>${b.description}</em></button>`).join('')}</div><p class="hint">Use M in a level to return to this map.</p>`;
   overlay.classList.remove('hidden');
   overlay.querySelectorAll('[data-stage]').forEach(button=>button.onclick=()=>enterLevel(Number(button.dataset.stage)));
@@ -251,6 +252,10 @@ function end(win) {
 }
 function update(dt) {
   time+=dt;
+  if(canvasTouch&&!canvasTouch.swiped&&!canvasTouch.held){
+    canvasTouch.age+=dt;
+    if(canvasTouch.age>=.16){canvasTouch.held=true;mouse.down=true;}
+  }
   for(const k of ['cool','inv','recoil','padCooldown','jumpBuffer'])player[k]=Math.max(0,player[k]-dt);
   player.coyote=player.ground?.1:Math.max(0,player.coyote-dt);
   const input=(keys.has('d')||keys.has('arrowright')?1:0)-(keys.has('a')||keys.has('arrowleft')?1:0);
@@ -498,7 +503,7 @@ function draw() {
 function pause() {
   if(state==='play'){state='pause';overlay.innerHTML='<small>TAKE A BREATHER</small><h2>Adventure paused.</h2><p>Press P or click below to continue.</p><button id="resume">Keep exploring →</button>';overlay.classList.remove('hidden');document.querySelector('#resume').onclick=pause;}
   else if(state==='pause'){state='play';overlay.classList.add('hidden');canvas.focus();}
-  keys.clear();mouse.down=false;activeAimPointer=null;mobileAim=null;
+  keys.clear();mouse.down=false;activeAimPointer=null;mobileAim=null;canvasTouch=null;touchGestures.clear();
 }
 function pointerPosition(e){const r=canvas.getBoundingClientRect();mouse.x=(e.clientX-r.left)*W/r.width;mouse.y=(e.clientY-r.top)*H/r.height;}
 function hotbarClick(x,y){if(y<614||y>689)return false;const i=Math.floor((x-19)/119),entry=hotbarEntries()[i];if(!entry)return true;if(entry.kind==='weapon')equip(entry.weapon);else if(entry.kind==='potion')heal();return true;}
@@ -512,7 +517,7 @@ function bindMobileControls(){
       const action=button.dataset.control;
       if(action==='left'||action==='right'){keys.add(action==='left'?'a':'d');}
       else if(action==='jump')jump();
-      else if(action==='attack'){activeAimPointer=e.pointerId;startX=e.clientX;startY=e.clientY;mobileAim={x:player.face*200,y:0};mouse.down=true;}
+      else if(action==='attack'){activeAimPointer=e.pointerId;startX=e.clientX;startY=e.clientY;mobileAim={x:player.face*200,y:0};mouse.down=true;attack();}
       else if(action==='heal')heal();
       else if(action==='map'){if(training)beginAdventure();else showMap();}
       else if(action==='pause')pause();
@@ -541,11 +546,36 @@ function bindInputs() {
     if(k==='p')pause();if(k==='r'&&(state==='over'||state==='win'))start();
   });
   window.addEventListener('keyup',e=>{const k=e.key.toLowerCase();keys.delete(k);if([' ','w','arrowup'].includes(k)&&player.vy<-180)player.vy*=.6;});
-  window.addEventListener('blur',()=>{if(state==='play')pause();keys.clear();mouse.down=false;activeAimPointer=null;mobileAim=null;});
+  window.addEventListener('blur',()=>{if(state==='play')pause();keys.clear();mouse.down=false;activeAimPointer=null;mobileAim=null;canvasTouch=null;touchGestures.clear();});
+  // Capture touch gestures before a control button can stop propagation.
+  window.addEventListener('pointerdown',e=>{
+    if(e.pointerType==='touch'&&state==='play')touchGestures.set(e.pointerId,{x:e.clientX,y:e.clientY,swiped:!!e.target?.closest?.('[data-control="jump"]')});
+  },true);
+  window.addEventListener('pointermove',e=>{
+    const gesture=touchGestures.get(e.pointerId);
+    if(!gesture||gesture.swiped||state!=='play')return;
+    const dx=e.clientX-gesture.x,dy=e.clientY-gesture.y;
+    if(dy<=-55&&-dy>Math.abs(dx)*1.25){
+      gesture.swiped=true;e.preventDefault();
+      if(canvasTouch?.pointerId===e.pointerId){canvasTouch.swiped=true;mouse.down=false;}
+      jump();
+    }
+  },true);
   canvas.addEventListener('pointermove',e=>{if(activeAimPointer===null||activeAimPointer===e.pointerId)pointerPosition(e);});
-  canvas.addEventListener('pointerdown',e=>{if(e.button!==0||state!=='play')return;e.preventDefault();pointerPosition(e);canvas.focus();if(hotbarClick(mouse.x,mouse.y))return;activeAimPointer=e.pointerId;canvas.setPointerCapture?.(e.pointerId);mouse.down=true;});
-  const releaseAim=e=>{if(e.pointerId===activeAimPointer){mouse.down=false;mobileAim=null;activeAimPointer=null;}};
-  window.addEventListener('pointerup',releaseAim);window.addEventListener('pointercancel',releaseAim);
+  canvas.addEventListener('pointerdown',e=>{if(e.button!==0||state!=='play')return;e.preventDefault();pointerPosition(e);canvas.focus();if(hotbarClick(mouse.x,mouse.y))return;activeAimPointer=e.pointerId;canvas.setPointerCapture?.(e.pointerId);
+    if(e.pointerType==='touch')canvasTouch={pointerId:e.pointerId,age:0,held:false,swiped:false};
+    else mouse.down=true;
+  });
+  const releaseAim=(e,cancelled=false)=>{
+    if(e.pointerId===activeAimPointer){
+      if(canvasTouch?.pointerId===e.pointerId&&!cancelled&&!canvasTouch.held&&!canvasTouch.swiped&&state==='play'){
+        pointerPosition(e);attack(true);
+      }
+      mouse.down=false;mobileAim=null;activeAimPointer=null;canvasTouch=null;
+    }
+    touchGestures.delete(e.pointerId);
+  };
+  window.addEventListener('pointerup',e=>releaseAim(e));window.addEventListener('pointercancel',e=>releaseAim(e,true));
   bindMobileControls();
 }
 reset();bindInputs();

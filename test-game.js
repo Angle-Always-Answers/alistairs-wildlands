@@ -1,14 +1,23 @@
 // Dependency-free gameplay regression checks. Run: node test-game.js
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
-const handlers={};const noop=()=>{};
+const handlers={},canvasListeners={};const noop=()=>{};
 const mobileButtons=Object.fromEntries(['left','right','jump','attack','heal','map','pause','prev','next'].map(action=>[action,{dataset:{control:action},listeners:{},classList:{add:noop,remove:noop},addEventListener(k,f){this.listeners[k]=f},setPointerCapture:noop}]));
 const touch=(action,kind='pointerdown',x=100,y=100)=>mobileButtons[action].listeners[kind]({pointerId:7,clientX:x,clientY:y,preventDefault:noop,stopPropagation:noop});
 const ctx=new Proxy({createLinearGradient:()=>({addColorStop:noop})},{get:(o,k)=>o[k]||noop,set:(o,k,v)=>(o[k]=v,true)});
 const overlay={classList:{add:noop,remove:noop},querySelectorAll:()=>[],focus:noop};
-const canvas={getContext:()=>ctx,addEventListener:noop,focus:noop,getBoundingClientRect:()=>({left:0,top:0,width:1100,height:700})};
+const canvas={getContext:()=>ctx,addEventListener:(k,f)=>canvasListeners[k]=f,focus:noop,getBoundingClientRect:()=>({left:0,top:0,width:1100,height:700})};
 const box={document:{querySelector:s=>s==='#game'?canvas:overlay,querySelectorAll:s=>s==='[data-control]'?Object.values(mobileButtons):[]},window:{addEventListener:(k,f)=>handlers[k]=f},requestAnimationFrame:noop,console,Math};vm.createContext(box);
 vm.runInContext(fs.readFileSync(__dirname+'/game.js','utf8'),box);const run=s=>vm.runInContext(s,box);const key=k=>handlers.keydown({key:k,repeat:false,preventDefault:noop});
+const canvasTouch=(kind,x,y,id=17)=>{const e={pointerId:id,pointerType:'touch',button:0,clientX:x,clientY:y,preventDefault:noop,stopPropagation:noop};if(kind==='pointerdown')handlers.pointerdown(e);if(kind==='pointermove')handlers.pointermove(e);canvasListeners[kind]?.(e);if(kind==='pointerup'||kind==='pointercancel')handlers[kind](e);};
 run('start();draw()');assert.equal(run('state'),'play');assert.equal(run('training'),true);
+run('player.ground=true;player.jumps=0;player.coyote=0;player.attack=null;player.cool=0');
+canvasTouch('pointerdown',400,400);canvasTouch('pointermove',400,330);assert.equal(run('player.jumps'),1,'first upward swipe jumps');assert.equal(run('player.attack'),null,'swipe does not attack');canvasTouch('pointerup',400,330);
+canvasTouch('pointerdown',400,400);canvasTouch('pointermove',400,330);assert.equal(run('player.jumps'),2,'second upward swipe double jumps');canvasTouch('pointerup',400,330);
+canvasTouch('pointerdown',400,400);canvasTouch('pointerup',400,400);assert.ok(run('player.attack'),'tap attacks once');assert.equal(run('mouse.down'),false);
+run('player.attack=null;player.cool=0');canvasTouch('pointerdown',400,400);run('update(.2)');assert.ok(run('player.attack'),'holding attacks');assert.equal(run('mouse.down'),true);canvasTouch('pointerup',400,400);assert.equal(run('mouse.down'),false);
+run('player.weapon=1;player.unlocked[1]=true;player.attack=null;player.cool=0');canvasTouch('pointerdown',400,400);run('update(.2)');assert.ok(run('player.cool>0'),'hold fires');run('update(.5)');assert.ok(run('player.cool>0'),'hold fires again after cooldown');canvasTouch('pointerup',400,400);
+run('player.weapon=0;player.unlocked[1]=false');
+run('player.attack=null;player.cool=0;player.jumps=0');
 touch('right');assert.equal(run('keys.has("d")'),true);touch('right','pointerup');assert.equal(run('keys.has("d")'),false);
 touch('attack');assert.equal(run('mouse.down'),true);touch('attack','pointermove',60,100);assert.ok(run('mobileAim.x<0'));touch('attack','pointerup');assert.equal(run('mouse.down'),false);
 assert.equal(run('player.inventory.length'),1);assert.equal(run('hotbarEntries().length'),1);assert.equal(run('player.ammo'),0);
