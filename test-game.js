@@ -1,12 +1,16 @@
 // Dependency-free gameplay regression checks. Run: node test-game.js
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const handlers={};const noop=()=>{};
+const mobileButtons=Object.fromEntries(['left','right','jump','attack','heal','map','pause','prev','next'].map(action=>[action,{dataset:{control:action},listeners:{},classList:{add:noop,remove:noop},addEventListener(k,f){this.listeners[k]=f},setPointerCapture:noop}]));
+const touch=(action,kind='pointerdown',x=100,y=100)=>mobileButtons[action].listeners[kind]({pointerId:7,clientX:x,clientY:y,preventDefault:noop,stopPropagation:noop});
 const ctx=new Proxy({createLinearGradient:()=>({addColorStop:noop})},{get:(o,k)=>o[k]||noop,set:(o,k,v)=>(o[k]=v,true)});
 const overlay={classList:{add:noop,remove:noop},querySelectorAll:()=>[],focus:noop};
 const canvas={getContext:()=>ctx,addEventListener:noop,focus:noop,getBoundingClientRect:()=>({left:0,top:0,width:1100,height:700})};
-const box={document:{querySelector:s=>s==='#game'?canvas:overlay},window:{addEventListener:(k,f)=>handlers[k]=f},requestAnimationFrame:noop,console,Math};vm.createContext(box);
+const box={document:{querySelector:s=>s==='#game'?canvas:overlay,querySelectorAll:s=>s==='[data-control]'?Object.values(mobileButtons):[]},window:{addEventListener:(k,f)=>handlers[k]=f},requestAnimationFrame:noop,console,Math};vm.createContext(box);
 vm.runInContext(fs.readFileSync(__dirname+'/game.js','utf8'),box);const run=s=>vm.runInContext(s,box);const key=k=>handlers.keydown({key:k,repeat:false,preventDefault:noop});
 run('start();draw()');assert.equal(run('state'),'play');assert.equal(run('training'),true);
+touch('right');assert.equal(run('keys.has("d")'),true);touch('right','pointerup');assert.equal(run('keys.has("d")'),false);
+touch('attack');assert.equal(run('mouse.down'),true);touch('attack','pointermove',60,100);assert.ok(run('mobileAim.x<0'));touch('attack','pointerup');assert.equal(run('mouse.down'),false);
 assert.equal(run('player.inventory.length'),1);assert.equal(run('hotbarEntries().length'),1);assert.equal(run('player.ammo'),0);
 run('for(let i=0;i<1200;i++)update(1/60)');assert.equal(run('player.hp'),100);assert.equal(run('enemies.length'),2);
 run('jump();jump();jump()');assert.equal(run('player.jumps'),2);

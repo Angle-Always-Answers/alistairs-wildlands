@@ -12,4 +12,6 @@ Spring pads launch you only when you land on them. Floor traps cannot strike thr
 
 Move with A/D or left/right arrows. Space, W, or up arrow jumps, including a double jump. Release early for a shorter hop. Hold J to attack ahead or click to attack toward the mouse, including with melee weapons. Number keys select the corresponding collected weapon in the hotbar; clicking an item works too. E uses a health potion, P pauses, M opens the map, and R restarts after victory or defeat. The pistol fires slowly with no spread; faster guns are less accurate.
 
+On a phone, turn to landscape. Use the left and right touch buttons to move, Jump and Heal on the right, and hold Attack to fire or swing. Drag from Attack to aim. Gear buttons cycle through weapons you have collected. The Map button leaves the practice camp or opens the travel map; Pause stops the game. The phone layout fills the screen and accounts for display cutouts.
+
 The sprites in `assets/starter-pack` and `assets/monsters` load locally. `make-monsters.js` regenerates the monster and obstacle PNGs using `@napi-rs/canvas`; this build dependency is not needed to play. `node test-game.js` runs gameplay checks. `render-preview.js` produces offscreen visual snapshots when supplied with the canvas library. The original chess project in the parent folder is unchanged.

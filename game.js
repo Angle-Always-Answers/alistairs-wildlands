@@ -5,6 +5,7 @@ const overlay = document.querySelector('#overlay');
 const W = 1100, H = 700, LEVEL_LENGTH = 4800, WORLD = LEVEL_LENGTH * 3, FLOOR = 570;
 const keys = new Set();
 const mouse = {x:600, y:300, down:false};
+let activeAimPointer=null,mobileAim=null;
 const weapons = [
   {name:'RUSTY SWORD', damage:18, range:108, cool:.52, duration:.38, kind:'thrust', color:'#c7edf0', tip:'Starter sword · 18 damage. Find upgrades in the levels.'},
   {name:'PISTOL', damage:30, cool:.48, spread:0, gun:true, color:'#f6d086', tip:'Slow and perfectly accurate'},
@@ -76,7 +77,7 @@ function reset() {
   ];
   // Loaner gear must be picked up in camp and stays there when the map opens.
   trainingLoot=[1,3,4,5,6,2].map((weapon,i)=>({x:290+i*115,y:FLOOR-28,type:'weapon',weapon}));
-  keys.clear();mouse.down=false;
+  keys.clear();mouse.down=false;activeAimPointer=null;mobileAim=null;
 }
 function start() {reset();state='play';overlay.classList.add('hidden');canvas.focus();}
 function beginAdventure() {
@@ -86,7 +87,7 @@ function beginAdventure() {
   stage=0;region=0;camera=0;showMap();
 }
 function showMap() {
-  state='map';keys.clear();mouse.down=false;
+  state='map';keys.clear();mouse.down=false;activeAimPointer=null;mobileAim=null;
   overlay.innerHTML=`<small>THE WILDLANDS MAP</small><h2>Choose your next journey.</h2><p>Each land has its own monsters, hazards, rewards, and exit gate. Gear found in levels carries forward; camp gear is for practice.</p><div class="map-stages">${biomes.map((b,i)=>`<button class="map-stage" data-stage="${i}" ${i>unlockedStage?'disabled':''}><strong>${i+1}. ${b.name}</strong><span>${completed[i]?'✓ CLEARED':i>unlockedStage?'LOCKED':`DEFEAT ${b.goal} MONSTERS${i===2?' + BOSS':''}`}</span><em>${b.description}</em></button>`).join('')}</div><p class="hint">Use M in a level to return to this map.</p>`;
   overlay.classList.remove('hidden');
   overlay.querySelectorAll('[data-stage]').forEach(button=>button.onclick=()=>enterLevel(Number(button.dataset.stage)));
@@ -265,6 +266,7 @@ function update(dt) {
   if(!training&&player.ground&&wasFalling&&previousFeet<FLOOR-1&&player.y+player.h>=FLOOR-1&&player.padCooldown===0&&springPads.some(x=>Math.abs(player.x+12-x)<28)) {
     player.vy=-760;player.ground=false;player.jumps=1;player.padCooldown=.5;tone(610,.13);burst(player.x,player.y+42,'#c4f28a',14);
   }
+  if(mobileAim){mouse.x=player.x+12-camera+mobileAim.x;mouse.y=player.y+20+mobileAim.y;}
   if(keys.has('j')||mouse.down)attack(mouse.down);
   tickMelee(dt);
   spawnTimer-=dt;
@@ -494,10 +496,37 @@ function draw() {
 function pause() {
   if(state==='play'){state='pause';overlay.innerHTML='<small>TAKE A BREATHER</small><h2>Adventure paused.</h2><p>Press P or click below to continue.</p><button id="resume">Keep exploring →</button>';overlay.classList.remove('hidden');document.querySelector('#resume').onclick=pause;}
   else if(state==='pause'){state='play';overlay.classList.add('hidden');canvas.focus();}
-  keys.clear();mouse.down=false;
+  keys.clear();mouse.down=false;activeAimPointer=null;mobileAim=null;
 }
 function pointerPosition(e){const r=canvas.getBoundingClientRect();mouse.x=(e.clientX-r.left)*W/r.width;mouse.y=(e.clientY-r.top)*H/r.height;}
 function hotbarClick(x,y){if(y<614||y>689)return false;const i=Math.floor((x-19)/119),entry=hotbarEntries()[i];if(!entry)return true;if(entry.kind==='weapon')equip(entry.weapon);else if(entry.kind==='potion')heal();return true;}
+function cycleWeapon(direction){const i=player.inventory.indexOf(player.weapon),next=(i+direction+player.inventory.length)%player.inventory.length;equip(player.inventory[next]);}
+function bindMobileControls(){
+  const controls=document.querySelectorAll('[data-control]');
+  for(const button of controls){
+    let heldPointer=null,startX=0,startY=0;
+    button.addEventListener('pointerdown',e=>{
+      if(state!=='play')return;e.preventDefault();e.stopPropagation();heldPointer=e.pointerId;button.setPointerCapture?.(e.pointerId);button.classList.add('pressed');
+      const action=button.dataset.control;
+      if(action==='left'||action==='right'){keys.add(action==='left'?'a':'d');}
+      else if(action==='jump')jump();
+      else if(action==='attack'){activeAimPointer=e.pointerId;startX=e.clientX;startY=e.clientY;mobileAim={x:player.face*200,y:0};mouse.down=true;}
+      else if(action==='heal')heal();
+      else if(action==='map'){if(training)beginAdventure();else showMap();}
+      else if(action==='pause')pause();
+      else if(action==='prev'||action==='next')cycleWeapon(action==='prev'?-1:1);
+    });
+    button.addEventListener('pointermove',e=>{if(e.pointerId===heldPointer&&button.dataset.control==='attack'){
+      const dx=e.clientX-startX,dy=e.clientY-startY;
+      if(Math.hypot(dx,dy)>10)mobileAim={x:dx*4,y:dy*4};
+    }});
+    const release=e=>{if(e.pointerId!==heldPointer)return;button.classList.remove('pressed');heldPointer=null;
+      if(button.dataset.control==='left')keys.delete('a');if(button.dataset.control==='right')keys.delete('d');
+      if(button.dataset.control==='attack'){mouse.down=false;mobileAim=null;activeAimPointer=null;}
+    };
+    button.addEventListener('pointerup',release);button.addEventListener('pointercancel',release);button.addEventListener('lostpointercapture',release);
+  }
+}
 function bindInputs() {
   document.querySelector('#start').onclick=start;
   document.querySelector('#sound').onclick=()=>{sound=!sound;document.querySelector('#sound').textContent=`Sound: ${sound?'on':'off'}`;tone(500);};
@@ -510,10 +539,12 @@ function bindInputs() {
     if(k==='p')pause();if(k==='r'&&(state==='over'||state==='win'))start();
   });
   window.addEventListener('keyup',e=>{const k=e.key.toLowerCase();keys.delete(k);if([' ','w','arrowup'].includes(k)&&player.vy<-180)player.vy*=.6;});
-  window.addEventListener('blur',()=>{if(state==='play')pause();keys.clear();mouse.down=false;});
-  canvas.addEventListener('pointermove',pointerPosition);
-  canvas.addEventListener('pointerdown',e=>{if(e.button!==0||state!=='play')return;pointerPosition(e);canvas.focus();if(hotbarClick(mouse.x,mouse.y))return;mouse.down=true;});
-  window.addEventListener('pointerup',()=>mouse.down=false);
+  window.addEventListener('blur',()=>{if(state==='play')pause();keys.clear();mouse.down=false;activeAimPointer=null;mobileAim=null;});
+  canvas.addEventListener('pointermove',e=>{if(activeAimPointer===null||activeAimPointer===e.pointerId)pointerPosition(e);});
+  canvas.addEventListener('pointerdown',e=>{if(e.button!==0||state!=='play')return;e.preventDefault();pointerPosition(e);canvas.focus();if(hotbarClick(mouse.x,mouse.y))return;activeAimPointer=e.pointerId;canvas.setPointerCapture?.(e.pointerId);mouse.down=true;});
+  const releaseAim=e=>{if(e.pointerId===activeAimPointer){mouse.down=false;mobileAim=null;activeAimPointer=null;}};
+  window.addEventListener('pointerup',releaseAim);window.addEventListener('pointercancel',releaseAim);
+  bindMobileControls();
 }
 reset();bindInputs();
 function frame(now){const dt=Math.min((now-last)/1000,.033);last=now;if(state==='play')update(dt);draw();requestAnimationFrame(frame);}
