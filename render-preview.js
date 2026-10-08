@@ -11,10 +11,10 @@ const {createCanvas,loadImage}=require(process.argv[2]||'@napi-rs/canvas');
   for(const file of fs.readdirSync(path.join(__dirname,'assets/monsters')))if(file.endsWith('.png'))box.loaded[file.slice(0,-4)]=await loadImage(path.join(__dirname,'assets/monsters',file));
   const run=s=>vm.runInContext(s,box);run('Object.assign(sprites,loaded);start();draw()');
   const dir=path.join(__dirname,'previews');fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,'practice.png'),canvas.toBuffer('image/png'));
-  run('beginAdventure();unlockedStage=2;enterLevel(1);player.x=LEVEL_LENGTH+3900;player.y=240;region=1;camera=LEVEL_LENGTH+3500;spawnMonster("scorpion",player.x+260);draw()');fs.writeFileSync(path.join(dir,'amber-ridge.png'),canvas.toBuffer('image/png'));
-  run('enterLevel(2);player.x=LEVEL_LENGTH*2+3900;player.y=168;region=2;camera=LEVEL_LENGTH*2+3500;spawnMonster("wisp",player.x+220);spawnMonster("warden",player.x+450);draw()');fs.writeFileSync(path.join(dir,'moonstone.png'),canvas.toBuffer('image/png'));
-  for(const [index,name,monster] of [[3,'mirewood','mushroom'],[4,'frostglass','golem'],[5,'ember-citadel','scorpion']]){
-    run(`unlockedStage=5;enterLevel(${index});player.x=${index}*LEVEL_LENGTH+1800;player.y=528;camera=${index}*LEVEL_LENGTH+1350;spawnMonster('${monster}',player.x+300);draw()`);
+  run('beginAdventure();unlockedStage=9');
+  for(const [index,name,monster] of [[0,'fernwood','slime'],[1,'amber-ridge','sandjaw'],[2,'mirewood','mushroom'],[3,'whisperwood','bat'],[4,'frostglass','golem'],[5,'moonstone','warden'],[6,'stormbreak','wolf'],[7,'obsidian','golem'],[8,'sunflare','scorpion'],[9,'ember-citadel','titan']]){
+    const boss=[1,5,9].includes(index),offset=boss?3900:1800;
+    run(`enterLevel(${index});player.x=${index}*LEVEL_LENGTH+${offset};player.y=528;camera=${index}*LEVEL_LENGTH+${offset-400};spawnMonster('${monster}',player.x+300);draw()`);
     fs.writeFileSync(path.join(dir,name+'.png'),canvas.toBuffer('image/png'));
   }
   const sheet=createCanvas(1100,630),sctx=sheet.getContext('2d');
