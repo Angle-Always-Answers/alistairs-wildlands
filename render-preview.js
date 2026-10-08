@@ -5,7 +5,7 @@ const {createCanvas,loadImage}=require(process.argv[2]||'@napi-rs/canvas');
 (async()=>{
   const canvas=createCanvas(1100,700);canvas.focus=()=>{};canvas.addEventListener=()=>{};
   const element={classList:{add(){},remove(){}},focus(){},querySelectorAll(){return []}};
-  const box={document:{querySelector:s=>s==='#game'?canvas:element},window:{addEventListener(){}},requestAnimationFrame(){},console,Math};
+  const box={document:{querySelector:s=>s==='#game'?canvas:element,querySelectorAll(){return []}},window:{addEventListener(){}},requestAnimationFrame(){},console,Math};
   vm.createContext(box);vm.runInContext(fs.readFileSync(path.join(__dirname,'game.js'),'utf8'),box);
   box.loaded={};for(const file of fs.readdirSync(path.join(__dirname,'assets/starter-pack')))if(file.endsWith('.png')&&!file.includes('source')&&!file.includes('sheet'))box.loaded[file.slice(0,-4)]=await loadImage(path.join(__dirname,'assets/starter-pack',file));
   for(const file of fs.readdirSync(path.join(__dirname,'assets/monsters')))if(file.endsWith('.png'))box.loaded[file.slice(0,-4)]=await loadImage(path.join(__dirname,'assets/monsters',file));
@@ -13,6 +13,10 @@ const {createCanvas,loadImage}=require(process.argv[2]||'@napi-rs/canvas');
   const dir=path.join(__dirname,'previews');fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,'practice.png'),canvas.toBuffer('image/png'));
   run('beginAdventure();unlockedStage=2;enterLevel(1);player.x=LEVEL_LENGTH+3900;player.y=240;region=1;camera=LEVEL_LENGTH+3500;spawnMonster("scorpion",player.x+260);draw()');fs.writeFileSync(path.join(dir,'amber-ridge.png'),canvas.toBuffer('image/png'));
   run('enterLevel(2);player.x=LEVEL_LENGTH*2+3900;player.y=168;region=2;camera=LEVEL_LENGTH*2+3500;spawnMonster("wisp",player.x+220);spawnMonster("warden",player.x+450);draw()');fs.writeFileSync(path.join(dir,'moonstone.png'),canvas.toBuffer('image/png'));
+  for(const [index,name,monster] of [[3,'mirewood','mushroom'],[4,'frostglass','golem'],[5,'ember-citadel','scorpion']]){
+    run(`unlockedStage=5;enterLevel(${index});player.x=${index}*LEVEL_LENGTH+1800;player.y=528;camera=${index}*LEVEL_LENGTH+1350;spawnMonster('${monster}',player.x+300);draw()`);
+    fs.writeFileSync(path.join(dir,name+'.png'),canvas.toBuffer('image/png'));
+  }
   const sheet=createCanvas(1100,630),sctx=sheet.getContext('2d');
   for(let row=0;row<3;row++)for(let col=0;col<4;col++){
     const weapon=[0,3,2][row];run(`start();player.x=410;player.y=528;player.weapon=${weapon};attack();player.attack.elapsed=weapons[${weapon}].duration*${[.12,.38,.62,.82][col]};draw()`);
