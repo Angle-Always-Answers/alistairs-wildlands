@@ -6,7 +6,7 @@ const mobileHud = document.querySelector('#mobile-hud');
 const W = 1100, H = 700, LEVEL_LENGTH = 4800, FLOOR = 570;
 const keys = new Set();
 const mouse = {x:600, y:300, down:false};
-let activeAimPointer=null,mobileAim=null,canvasTouch=null;
+let activeAimPointer=null,mobileAim=null,canvasTouch=null,laserHeld=false;
 const touchGestures=new Map();
 const weapons = [
   {name:'RUSTY SWORD', damage:18, range:108, cool:.52, duration:.38, kind:'thrust', color:'#c7edf0', tip:'Starter sword · 18 damage. Find upgrades in the levels.'},
@@ -18,12 +18,13 @@ const weapons = [
   {name:'SINGLE SHOT', damage:65, cool:1, spread:.015, gun:true, color:'#f6d086', tip:'Powerful, precise single rounds'},
   {name:'WOODEN CLUB', damage:12, range:68, cool:.5, duration:.35, kind:'sweep', color:'#c8a46c', tip:'Short reach · solid knockback'},
   {name:'PEBBLE SLING', damage:9, cool:.65, spread:.06, gun:true, freeAmmo:true, color:'#cfc1a3', tip:'Infinite pebbles · light damage'},
-  {name:'REED BOW', damage:16, cool:.8, spread:.02, gun:true, freeAmmo:true, color:'#a8db9d', tip:'Infinite arrows · precise but slow'},
+  {name:'FIRE STAFF', damage:18, cool:.62, spread:0, gun:true, freeAmmo:true, effect:'burn', color:'#ff985a', tip:'Piercing flame crosses the level and ignites enemies'},
   {name:'WIND STAFF', damage:0, range:112, cool:1.2, duration:.43, kind:'escape', color:'#b3f0ce', tip:'Escape tool · pushes enemies back, no damage'},
-  {name:'SPORE SPRAYER', damage:8, cool:.22, spread:.31, gun:true, freeAmmo:true, color:'#d6b0d9', tip:'Infinite spores · short, scattered bursts'},
+  {name:'THORN WHIP', damage:26, range:112, cool:.56, duration:.48, kind:'sweep', effect:'snare', color:'#a7d88b', tip:'Wide vine lash briefly slows monsters'},
   {name:'ICE PICK', damage:24, range:72, cool:.44, duration:.38, kind:'thrust', color:'#a5e0ef', tip:'Fast close-range stab'},
-  {name:'FROST STAFF', damage:34, cool:.63, spread:0, gun:true, freeAmmo:true, effect:'freeze', color:'#a8e8ff', tip:'Ice bolts slow monsters · unlimited magic'},
-  {name:'STORM STAFF', damage:46, cool:.72, spread:0, gun:true, freeAmmo:true, effect:'shock', color:'#fff0a3', tip:'Lightning bolts briefly stun monsters · unlimited magic'}
+  {name:'ICE STAFF', damage:23, cool:.9, spread:0, gun:true, freeAmmo:true, effect:'freeze', color:'#a8e8ff', tip:'Icicles freeze foes so they cannot move or touch you'},
+  {name:'STORM STAFF', damage:46, cool:.72, spread:0, gun:true, freeAmmo:true, effect:'shock', color:'#fff0a3', tip:'Lightning bolts briefly stun monsters · unlimited magic'},
+  {name:'LASER STAFF', damage:42, cool:0, spread:0, gun:true, freeAmmo:true, effect:'laser', color:'#fa87df', tip:'No cooldown · ricochets until you leave this level'}
 ];
 const powers={ice:{name:'ICE ORB',cool:3.2},dash:{name:'ROCKET DASH',cool:4.4},spark:{name:'SPARK',cool:3.7}};
 let character={name:'Alistair',look:'forest',powers:['ice','dash']};
@@ -76,6 +77,8 @@ const monsterStats={
 };
 let training, lessons, player, enemies, bullets, enemyShots, loot, trainingLoot, sparks, labels, waves, chests, camps;
 let kills, stageKills, completed, unlockedStage, stage=-1, bossSpawned, bossDefeated, time, spawnTimer, camera, state='title', last=0, sound=false, audio, region=0, activeBar=0, selectedSlot=0;
+const SKY_GOAL=18;
+let ship=null;
 // Optional sprite pack can be plugged in without making offline play depend on it.
 const sprites = {};
 function loadSprite(name, path) {
@@ -89,9 +92,10 @@ for(const name of Object.keys(monsterStats).filter(n=>!['slime','bat','sandjaw',
 for(const name of ['thorns','spikes','crystal-trap','log-platform','sandstone-platform','ruin-platform'])loadSprite(name,'assets/monsters/'+name+'.png');
 function reset() {
   training=true; lessons={move:false,jump:false,melee:false,shoot:false};
+  ship=null;document.querySelector('.frame')?.classList.remove('ship-mode');
   weapons[0].name='RUSTY SWORD';weapons[0].tip='Starter sword · 18 damage. Find upgrades in the levels.';
   player={x:100,y:FLOOR-42,w:24,h:42,vx:0,vy:0,hp:100,ammo:0,potions:0,
-    unlocked:weapons.map((_,i)=>i===0),inventory:[0],loadouts:[[0,null,null,null,null,null,null],[null,null,null,null,null,null,null]],weaponLevels:weapons.map(()=>0),swordLevel:0,weapon:0,face:1,jumps:0,ground:false,inv:0,cool:0,
+    unlocked:weapons.map((_,i)=>i===0||i===13),inventory:[0,13],loadouts:[[0,13,null,null,null,null,null],[null,null,null,null,null,null,null]],weaponLevels:weapons.map(()=>0),swordLevel:0,weapon:0,face:1,jumps:0,ground:false,inv:0,cool:0,
     attack:null,recoil:0,walk:0,coyote:0,jumpBuffer:0,padCooldown:0,treasures:0,name:character.name,look:character.look,powers:[...character.powers],powerCooldowns:{ice:0,dash:0,spark:0},poison:0,poisonTick:0,chilled:0,shocked:0,rocketDash:0};
   enemies=[{x:565,y:FLOOR-46,w:32,h:46,hp:99999,max:99999,vx:0,vy:0,color:'#d8b178',dummy:true},
     {x:700,y:FLOOR-46,w:32,h:46,hp:99999,max:99999,vx:0,vy:0,color:'#d8b178',dummy:true}];
@@ -103,17 +107,17 @@ function reset() {
     {x:LEVEL_LENGTH*2+1200,y:FLOOR-25,type:'weapon',weapon:10},{x:LEVEL_LENGTH*2+3350,y:FLOOR-25,type:'upgrade'},
     {x:LEVEL_LENGTH*3+1450,y:FLOOR-25,type:'weapon',weapon:11},{x:LEVEL_LENGTH*3+3420,y:FLOOR-25,type:'weapon',weapon:1},
     {x:LEVEL_LENGTH*4+1600,y:FLOOR-25,type:'weapon',weapon:12},{x:LEVEL_LENGTH*4+3400,y:FLOOR-25,type:'upgrade'},
-    {x:LEVEL_LENGTH*5+1520,y:FLOOR-25,type:'weapon',weapon:5},{x:LEVEL_LENGTH*5+2200,y:FLOOR-25,type:'weapon',weapon:13},{x:LEVEL_LENGTH*5+3340,y:FLOOR-25,type:'weapon-upgrade',weapon:1},
+    {x:LEVEL_LENGTH*5+1520,y:FLOOR-25,type:'weapon',weapon:5},{x:LEVEL_LENGTH*5+2200,y:FLOOR-25,type:'weapon-upgrade',weapon:13},{x:LEVEL_LENGTH*5+3340,y:FLOOR-25,type:'weapon-upgrade',weapon:1},
     {x:LEVEL_LENGTH*6+1540,y:FLOOR-25,type:'weapon',weapon:4},{x:LEVEL_LENGTH*6+3380,y:FLOOR-25,type:'weapon-upgrade',weapon:3},
     {x:LEVEL_LENGTH*7+1550,y:FLOOR-25,type:'weapon',weapon:6},{x:LEVEL_LENGTH*7+2200,y:FLOOR-25,type:'weapon',weapon:14},{x:LEVEL_LENGTH*7+3380,y:FLOOR-25,type:'weapon-upgrade',weapon:11},
-    {x:LEVEL_LENGTH*8+1580,y:FLOOR-25,type:'weapon',weapon:2},{x:LEVEL_LENGTH*8+3350,y:FLOOR-25,type:'upgrade'},
+    {x:LEVEL_LENGTH*8+1580,y:FLOOR-25,type:'weapon',weapon:2},{x:LEVEL_LENGTH*8+2200,y:FLOOR-25,type:'weapon',weapon:15},{x:LEVEL_LENGTH*8+3350,y:FLOOR-25,type:'upgrade'},
     {x:LEVEL_LENGTH*9+1620,y:FLOOR-25,type:'weapon-upgrade',weapon:2},{x:LEVEL_LENGTH*9+3400,y:FLOOR-25,type:'weapon-upgrade',weapon:5},
     ...Array.from({length:72},(_,i)=>({x:LEVEL_LENGTH*3+500+i*460,y:FLOOR-25,type:'ammo'})),
     ...Array.from({length:49},(_,i)=>({x:1200+i*950,y:FLOOR-28,type:'potion'}))
   ];
   if(typeof window.applySavedLevelEdits==='function')window.applySavedLevelEdits();
   trainingLoot=[];
-  keys.clear();mouse.down=false;activeAimPointer=null;mobileAim=null;canvasTouch=null;touchGestures.clear();
+  keys.clear();mouse.down=false;activeAimPointer=null;mobileAim=null;canvasTouch=null;laserHeld=false;touchGestures.clear();
 }
 function start() {
   const name=document.querySelector('#hero-name')?.value?.trim();
@@ -127,7 +131,7 @@ function start() {
 function beginAdventure() {
   training=false;enemies=[];bullets=[];enemyShots=[];waves=[];sparks=[];labels=[];
   Object.assign(player,{x:100,y:FLOOR-42,vx:0,vy:0,hp:100,ammo:0,potions:0,weapon:0,attack:null,cool:0,jumps:0,
-    unlocked:weapons.map((_,i)=>i===0),inventory:[0],loadouts:[[0,null,null,null,null,null,null],[null,null,null,null,null,null,null]],weaponLevels:weapons.map(()=>0),swordLevel:0});
+    unlocked:weapons.map((_,i)=>i===0||i===13),inventory:[0,13],loadouts:[[0,13,null,null,null,null,null],[null,null,null,null,null,null,null]],weaponLevels:weapons.map(()=>0),swordLevel:0});
   activeBar=0;selectedSlot=0;
   stage=0;region=0;camera=0;showMap();
 }
@@ -164,7 +168,11 @@ function enterLevel(i) {
 }
 function finishLevel() {
   completed[stage]=true;unlockedStage=Math.max(unlockedStage,Math.min(biomes.length-1,stage+1));
-  if(stage===biomes.length-1)end(true);else showMap();
+  if(stage===biomes.length-1)startSkyRun();else showMap();
+}
+function startSkyRun(){
+  ship={x:W/2,y:H-110,hp:100,inv:0,fireCooldown:0,spawnTimer:.8,scroll:0,kills:0,elapsed:0,bossSpawned:false,enemies:[],shots:[],enemyShots:[]};
+  keys.clear();mouse.down=false;laserHeld=false;state='ship';overlay.classList.add('hidden');document.querySelector('.frame')?.classList.add('ship-mode');canvas.focus();
 }
 function message(text,x=player.x,y=player.y-20,color='#fff') {labels.push({text,x,y,life:1.6,color});}
 function tone(freq,duration=.07) {
@@ -202,7 +210,7 @@ function castPower(slot){
 }
 function equip(i) {
   if(player.attack)return;
-  if(player.unlocked[i]){player.weapon=i;for(let bar=0;bar<2;bar++){const slot=player.loadouts[bar].indexOf(i);if(slot>=0){activeBar=bar;selectedSlot=slot;break;}}tone(250+i*70);}
+  if(player.unlocked[i]){player.weapon=i;laserHeld=false;for(let bar=0;bar<2;bar++){const slot=player.loadouts[bar].indexOf(i);if(slot>=0){activeBar=bar;selectedSlot=slot;break;}}tone(250+i*70);}
   else message('Find that weapon in a level first!');
 }
 function weaponDamage(i){return i===0?weapons[0].damage+player.swordLevel*18:weapons[i].damage+player.weaponLevels[i]*Math.max(2,Math.round(weapons[i].damage*.2));}
@@ -211,15 +219,18 @@ function attack(aim=false) {
   if(state!=='play'||player.cool>0||player.attack)return;
   if(aim)player.face=mouse.x+camera>=player.x+player.w/2?1:-1;
   const w=weapons[player.weapon];player.cool=w.cool;
+  if(w.effect==='laser')laserHeld=true;
   if(w.gun) {
     if(!w.freeAmmo&&!training&&player.ammo<=0){message('No ammo — use a melee weapon!');tone(90);return;}
     if(!w.freeAmmo&&!training)player.ammo--;lessons.shoot=true;player.recoil=.1;
     const x=player.x+12,y=player.y+19;
     const a=aim?Math.atan2(mouse.y-y,mouse.x+camera-x):(player.face===1?0:Math.PI);
     player.face=Math.cos(a)>=0?1:-1;
+    if(w.effect==='laser'){const active=bullets.filter(b=>b.effect==='laser'&&b.life>0);if(active.length>=3)active[0].life=0;}
     for(let n=0;n<(w.pellets||1);n++) {
       const angle=a+(Math.random()-.5)*2*w.spread;
-      bullets.push({x,y,vx:Math.cos(angle)*(w.effect?730:920),vy:Math.sin(angle)*(w.effect?730:920),life:1.4,damage:weaponDamage(player.weapon),effect:w.effect,color:w.color});
+      const speed=w.effect==='laser'?640:w.effect==='burn'?900:w.effect?730:920;
+      bullets.push({x,y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,life:w.effect==='laser'?Infinity:w.effect==='burn'?LEVEL_LENGTH/speed+1:1.4,damage:weaponDamage(player.weapon),effect:w.effect,color:w.color,hitTargets:w.effect==='burn'?new Set():w.effect==='laser'?new Map():null});
     }
     burst(x+Math.cos(a)*37,y+Math.sin(a)*37,'#ffd574',4);tone(150,.045);
   } else {
@@ -253,7 +264,7 @@ function tickMelee(dt) {
         const along=dx*Math.cos(angle)+dy*Math.sin(angle),side=-dx*Math.sin(angle)+dy*Math.cos(angle);
         const radius=Math.min(e.w,e.h)*.4;
         if(along>=12-radius&&along<=reach+radius&&Math.abs(side)<(w.kind==='thrust'?9:22)+radius) {
-          if(w.damage>0)hit(e,weaponDamage(a.weapon));a.hits.add(e);knockback(e,a.face,w.kind==='escape'?1800:w.kind==='thrust'?750:960,190);
+          if(w.damage>0)hit(e,weaponDamage(a.weapon));if(w.effect==='snare'&&!e.boss)e.slow=1.5;a.hits.add(e);knockback(e,a.face,w.kind==='escape'?1800:w.kind==='thrust'?750:960,190);
         }
       }
     }
@@ -393,12 +404,60 @@ function end(win) {
   overlay.innerHTML=`<small>${win?'FRONTIER HERO':'A NEW ADVENTURE AWAITS'}</small><h2>${win?'You won!':'Back to camp.'}</h2><p>${win?`${biomes.length} lands explored! ${player.treasures}/${chestSpots.length} treasure caches discovered.`:`You defeated ${kills} monsters. Try a different power pair next time!`}</p><button id="start">Play again →</button><button id="customize">Change hero & powers</button><p class="hint">Or press R to restart.</p>`;
   overlay.classList.remove('hidden');document.querySelector('#start').onclick=start;document.querySelector('#customize').onclick=showCharacterCreator;
 }
+function shootShip(){
+  if(state!=='ship'||ship.fireCooldown>0)return;
+  ship.fireCooldown=.16;
+  for(const dx of [-12,12])ship.shots.push({x:ship.x+dx,y:ship.y-30,vy:-760});
+  tone(480,.035);
+}
+function spawnShipEnemy(boss=false){
+  const x=boss?W/2:70+Math.random()*(W-140),hp=boss?48:3;
+  ship.enemies.push({x,y:boss?115:-35,hp,max:hp,boss,phase:Math.random()*7,shoot:boss?.75:1.2+Math.random()*1.2});
+}
+function finishSkyRun(win){
+  state=win?'win':'over';keys.clear();mouse.down=false;
+  overlay.innerHTML=`<small>${win?'WILDLANDS SKY ACE':'SKY RUN ENDED'}</small><h2>${win?'You won on land and in the sky!':'The sky squadron got through.'}</h2><p>${win?`You cleared all ten lands and defeated the sky ace. ${ship.kills} enemy planes shot down.`:`You shot down ${ship.kills} enemy planes. Try the Sky Run again after the citadel.`}</p><button id="start">Play again →</button><button id="customize">Change hero & powers</button>`;
+  overlay.classList.remove('hidden');document.querySelector('#start').onclick=start;document.querySelector('#customize').onclick=showCharacterCreator;
+}
+function updateShip(dt){
+  const s=ship;s.elapsed+=dt;s.scroll+=dt*125;s.inv=Math.max(0,s.inv-dt);s.fireCooldown=Math.max(0,s.fireCooldown-dt);
+  const dx=Number(keys.has('d')||keys.has('arrowright'))-Number(keys.has('a')||keys.has('arrowleft'));
+  const dy=Number(keys.has('s')||keys.has('arrowdown'))-Number(keys.has('w')||keys.has('arrowup'));
+  const length=Math.hypot(dx,dy)||1;s.x=Math.max(40,Math.min(W-40,s.x+dx/length*360*dt));s.y=Math.max(125,Math.min(H-45,s.y+dy/length*360*dt));
+  if(keys.has('j')||keys.has(' ')||mouse.down)shootShip();
+  if(s.kills<SKY_GOAL){s.spawnTimer-=dt;if(s.spawnTimer<=0&&s.enemies.filter(e=>!e.boss&&e.hp>0).length<5){spawnShipEnemy();s.spawnTimer=.8+Math.random()*.4;}}
+  else if(!s.bossSpawned){s.bossSpawned=true;spawnShipEnemy(true);}
+  for(const e of s.enemies){
+    if(e.hp<=0)continue;
+    if(e.boss){e.x=W/2+Math.sin(s.elapsed*.95)*245;e.y=110+Math.sin(s.elapsed*1.7)*18;}
+    else {e.y+=(115+e.phase*8)*dt;e.x+=Math.sin(s.elapsed*2+e.phase)*55*dt;}
+    e.shoot-=dt;
+    if(e.shoot<=0&&e.y>20&&e.y<H-145){
+      if(e.boss){for(const angle of [-.46,-.23,0,.23,.46])s.enemyShots.push({x:e.x,y:e.y+35,vx:Math.sin(angle)*210,vy:260*Math.cos(angle)});e.shoot=1.15;}
+      else {const angle=Math.atan2(s.y-e.y,s.x-e.x);s.enemyShots.push({x:e.x,y:e.y+17,vx:Math.cos(angle)*155,vy:Math.sin(angle)*155});e.shoot=2.1;}
+    }
+    if(s.inv<=0&&Math.abs(s.x-e.x)<(e.boss?58:30)&&Math.abs(s.y-e.y)<(e.boss?50:34)){s.hp=Math.max(0,s.hp-(e.boss?22:14));s.inv=.85;if(!e.boss)e.hp=0;}
+  }
+  for(const b of s.shots){b.y+=b.vy*dt;for(const e of s.enemies){if(e.hp<=0)continue;if(Math.abs(b.x-e.x)<(e.boss?54:24)&&Math.abs(b.y-e.y)<(e.boss?42:24)){e.hp--;b.y=-100;if(e.hp<=0){if(e.boss){finishSkyRun(true);return;}s.kills++;tone(610,.07);}break;}}}
+  for(const b of s.enemyShots){b.x+=b.vx*dt;b.y+=b.vy*dt;if(s.inv<=0&&Math.abs(b.x-s.x)<19&&Math.abs(b.y-s.y)<25){s.hp=Math.max(0,s.hp-9);s.inv=.7;b.y=H+100;}}
+  s.enemies=s.enemies.filter(e=>e.hp>0&&e.y<H+60);s.shots=s.shots.filter(b=>b.y>-30);s.enemyShots=s.enemyShots.filter(b=>b.y<H+30&&b.x>-30&&b.x<W+30);
+  if(s.hp<=0)finishSkyRun(false);
+}
 function showCharacterCreator(){
-  state='title';overlay.classList.remove('map-open','inventory-open');
-  overlay.innerHTML=`<small>THE EMERALD FRONTIER</small><h2>Create your hero.</h2><p>Choose a name, a look, and two powers. You can swap powers later in your pack.</p><div class="hero-creator"><label>Name <input id="hero-name" maxlength="16" autocomplete="off" value="Alistair"></label><label>Look <select id="hero-look"><option value="forest">Forest cloak</option><option value="storm">Storm cloak</option><option value="ember">Ember cloak</option></select></label><label>Q power <select id="hero-power-1"><option value="ice">Ice Orb</option><option value="dash">Rocket Dash</option><option value="spark">Spark</option></select></label><label>F power <select id="hero-power-2"><option value="dash">Rocket Dash</option><option value="ice">Ice Orb</option><option value="spark">Spark</option></select></label></div><button id="start">Begin adventure →</button><p class="hint">Find two magic staffs in later lands. Q and F cast your chosen powers.</p>`;
+  state='title';overlay.classList.remove('map-open','inventory-open');document.querySelector('.frame')?.classList.remove('ship-mode');
+  overlay.innerHTML=`<small>THE EMERALD FRONTIER</small><h2>Create your hero.</h2><p>Choose a name, a look, and two powers. You can swap powers later in your pack.</p><div class="hero-creator"><label>Name <input id="hero-name" maxlength="16" autocomplete="off" value="Alistair"></label><label>Look <select id="hero-look"><option value="forest">Forest cloak</option><option value="storm">Storm cloak</option><option value="ember">Ember cloak</option></select></label><label>Q power <select id="hero-power-1"><option value="ice">Ice Orb</option><option value="dash">Rocket Dash</option><option value="spark">Spark</option></select></label><label>F power <select id="hero-power-2"><option value="dash">Rocket Dash</option><option value="ice">Ice Orb</option><option value="spark">Spark</option></select></label></div><button id="start">Begin adventure →</button><p class="hint">Start with the Ice Staff; find Fire and Laser Staffs later. Q and F cast your chosen powers.</p>`;
   overlay.classList.remove('hidden');document.querySelector('#start').onclick=start;
   document.querySelector('#hero-name').value=character.name;document.querySelector('#hero-look').value=character.look;
   document.querySelector('#hero-power-1').value=character.powers[0];document.querySelector('#hero-power-2').value=character.powers[1];
+}
+function bounceLaser(b,previousX,previousY){
+  const left=training?6:stage*LEVEL_LENGTH+6,right=training?960:(stage+1)*LEVEL_LENGTH-8;
+  if(b.x<left){b.x=left+(left-b.x);b.vx=Math.abs(b.vx);}else if(b.x>right){b.x=right-(b.x-right);b.vx=-Math.abs(b.vx);}
+  if(b.y<8){b.y=8+(8-b.y);b.vy=Math.abs(b.vy);}else if(b.y>FLOOR-8){b.y=FLOOR-8-(b.y-(FLOOR-8));b.vy=-Math.abs(b.vy);}
+  if(!training)for(const p of platforms){if(p.level!==stage||b.x<p.x-3||b.x>p.x+p.w+3||b.y<p.y-3||b.y>p.y+25)continue;
+    if(previousX<p.x-3){b.x=p.x-4;b.vx=-Math.abs(b.vx);}else if(previousX>p.x+p.w+3){b.x=p.x+p.w+4;b.vx=Math.abs(b.vx);}
+    else if(previousY<p.y-3){b.y=p.y-4;b.vy=-Math.abs(b.vy);}else {b.y=p.y+26;b.vy=Math.abs(b.vy);}break;
+  }
 }
 function update(dt) {
   time+=dt;
@@ -426,7 +485,7 @@ function update(dt) {
     player.vy=-760;player.ground=false;player.jumps=1;player.padCooldown=.5;tone(610,.13);burst(player.x,player.y+42,'#c4f28a',14);
   }
   if(mobileAim){mouse.x=player.x+12-camera+mobileAim.x;mouse.y=player.y+20+mobileAim.y;}
-  if(keys.has('j')||mouse.down)attack(mouse.down);
+  if(keys.has('j')||mouse.down){if(weapons[player.weapon].effect!=='laser'||!laserHeld)attack(mouse.down);}else laserHeld=false;
   tickMelee(dt);
   spawnTimer-=dt;
   if(!training&&spawnTimer<=0&&enemies.filter(e=>!e.boss&&e.hp>0).length<3&&stageKills<biomes[stage].goal){spawnTimer=spawn()?(biomes[stage].spawnSeconds||3.6):1.2;}
@@ -438,20 +497,24 @@ function update(dt) {
     if(e.dummy){e.flash=Math.max(0,(e.flash||0)-dt);continue;}
     e.trapCooldown=Math.max(0,(e.trapCooldown||0)-dt);
     e.hitLabelCooldown=Math.max(0,(e.hitLabelCooldown||0)-dt);
-    e.slow=Math.max(0,(e.slow||0)-dt);e.stun=Math.max(0,(e.stun||0)-dt);e.rocketHitCooldown=Math.max(0,(e.rocketHitCooldown||0)-dt);
+    e.slow=Math.max(0,(e.slow||0)-dt);e.stun=Math.max(0,(e.stun||0)-dt);e.freeze=Math.max(0,(e.freeze||0)-dt);e.burn=Math.max(0,(e.burn||0)-dt);e.rocketHitCooldown=Math.max(0,(e.rocketHitCooldown||0)-dt);
+    if(e.burn>0){e.burnTick=(e.burnTick||0)+dt;if(e.burnTick>=.5){e.burnTick-=.5;hit(e,5);if(e.hp<=0)continue;}}
     const dir=Math.sign(player.x-e.x);
-    if(e.stun<=0){if(e.type==='witchbat')updateWitchbat(e,dt);else if(e.flying)updateFlying(e,dt);
+    if(e.stun<=0&&e.freeze<=0){if(e.type==='witchbat')updateWitchbat(e,dt);else if(e.flying)updateFlying(e,dt);
     else {if(e.type==='sandjaw')updateSandjaw(e,dt);else if(e.type==='warden')updateWarden(e,dt);else if(e.type==='titan')updateTitan(e,dt);else {const rush=e.charge&&Math.sin(time*1.8+e.phase)>.65?1.65:1;e.vx+=(dir*e.speed*(e.slow>0?.5:1)*rush-e.vx)*dt*3;if(e.ground&&(e.hop?Math.random()<dt*2.2:Math.random()<dt*.7))e.vy=e.hop?-445:-340;}physics(e,dt);if(e.type==='sandjaw'&&e.stomping&&e.ground){e.stomping=false;burst(e.x+e.w/2,e.y+e.h,'#e9c48d',14);}if(e.type==='titan'&&e.stomping&&e.ground){e.stomping=false;titanShockwave(e);}}}
     if(player.rocketDash>0&&e.rocketHitCooldown===0&&overlap(player,e)){hit(e,35);knockback(e,player.face,650,100);e.rocketHitCooldown=.5;}
-    if(e.type!=='warden'&&overlap(player,e)&&player.inv<=0){player.hp=Math.max(0,player.hp-e.damage);player.inv=1;player.vy=-220;if(e.type==='scorpion'){player.poison=3;player.poisonTick=0;message('POISONED!',player.x,player.y-25,'#b9f18f');}if(e.type==='frostmite'){player.chilled=1.8;message('CHILLED!',player.x,player.y-25,'#b6f1ff');}burst(player.x,player.y,'#ffb195');tone(80,.13);}
+    if(e.type!=='warden'&&e.freeze<=0&&overlap(player,e)&&player.inv<=0){player.hp=Math.max(0,player.hp-e.damage);player.inv=1;player.vy=-220;if(e.type==='scorpion'){player.poison=3;player.poisonTick=0;message('POISONED!',player.x,player.y-25,'#b9f18f');}if(e.type==='frostmite'){player.chilled=1.8;message('CHILLED!',player.x,player.y-25,'#b6f1ff');}burst(player.x,player.y,'#ffb195');tone(80,.13);}
   }
   for(const b of bullets) {
+    if(b.life<=0)continue;
     const ox=b.x,oy=b.y;b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;
+    if(b.effect==='laser')bounceLaser(b,ox,oy);
     for(const e of enemies) {
       if(e.hp<=0)continue;
+      if(b.effect==='burn'&&b.hitTargets.has(e)||b.effect==='laser'&&(b.hitTargets.get(e)??-Infinity)>time-.7)continue;
       const steps=Math.ceil(Math.hypot(b.x-ox,b.y-oy)/8);let found=false;
       for(let i=0;i<=steps;i++){const f=i/Math.max(1,steps),x=ox+(b.x-ox)*f,y=oy+(b.y-oy)*f;if(x>=e.x&&x<=e.x+e.w&&y>=e.y&&y<=e.y+e.h){found=true;break;}}
-      if(found){hit(e,b.damage);if(!e.boss&&b.effect==='freeze')e.slow=2.2;if(!e.boss&&b.effect==='shock')e.stun=.55;knockback(e,Math.sign(b.vx),b.damage*3.3,55);b.life=0;break;}
+      if(found){hit(e,b.damage);if(b.effect==='freeze')e.freeze=e.boss?.45:1.25;if(!e.boss&&b.effect==='shock')e.stun=.55;if(b.effect==='burn'){e.burn=3;e.burnTick=0;b.hitTargets.add(e);}if(b.effect==='laser')b.hitTargets.set(e,time);knockback(e,Math.sign(b.vx),b.damage*3.3,55);if(b.effect!=='burn'&&b.effect!=='laser'){b.life=0;break;}}
     }
   }
   for(const b of enemyShots){
@@ -624,7 +687,9 @@ function drawEnemy(e) {
     rect(e.x,e.y+4,e.w,e.h-4,e.color);rect(e.x+5,e.y,e.w-10,8,e.color);rect(e.x+7,e.y+10,5,5,'#25394c');rect(e.x+22,e.y+10,5,5,'#25394c');
   }
   if(e.flying&&e.flightTell>0){ctx.globalAlpha=.55+.35*Math.sin(time*18);rect(e.x-8,e.y-10,e.w+16,3,'#fff0a5');text('!',e.x+e.w/2-5,e.y-17,20,'#fff4b6');ctx.globalAlpha=1;}
-  if(e.slow>0){rect(e.x-2,e.y+e.h-3,e.w+4,4,'#8ce2ff');}
+  if(e.slow>0||e.freeze>0){rect(e.x-2,e.y+e.h-3,e.w+4,4,'#8ce2ff');}
+  if(e.freeze>0){rect(e.x-3,e.y-3,e.w+6,3,'#d9faff');rect(e.x-3,e.y+3,3,e.h-3,'#8ce2ff');}
+  if(e.burn>0){rect(e.x+e.w/2-4,e.y-9,8,8,'#ff9b4e');rect(e.x+e.w/2-2,e.y-13,4,6,'#ffe2a0');}
   if(e.stun>0){text('✦',e.x+e.w/2-7,e.y-14,20,'#ffeb9b');}
   if(e.hp<e.max&&!e.boss){rect(e.x,e.y-10,e.w,4,'#243936');rect(e.x,e.y-10,e.w*e.hp/e.max,4,'#f7a090');}
 }
@@ -642,10 +707,10 @@ function drawWeapon(x,y,dir,i,angle=0,scale=1) {
   else if(i===6){rect(-16,-2,28,10,'#a27a53');rect(8,-6,31,10,'#728886');rect(39,-4,29,4,'#aabdbd');rect(14,-14,18,5,'#839c99');rect(19,-9,4,4,'#526765');}
   else if(i===7){rect(-8,-3,40,7,'#785639');rect(24,-11,22,23,'#a77b4b');rect(28,-8,5,16,'#d2a66b');rect(39,-6,4,13,'#5c4234');}
   else if(i===8){rect(-7,-3,35,5,'#a9774b');line(20,-14,28,0,5,'#745340');line(20,14,28,0,5,'#745340');rect(37,-5,11,10,'#b9ae98');rect(41,-2,5,4,'#ece5cf');}
-  else if(i===9){line(20,-19,38,0,5,'#93ae73');line(38,0,20,19,5,'#93ae73');line(20,-19,20,19,2,'#e6e6c0');rect(10,-2,43,4,'#b4ca8c');ctx.fillStyle='#d7ecc1';ctx.beginPath();ctx.moveTo(53,-5);ctx.lineTo(61,0);ctx.lineTo(53,5);ctx.fill();}
+  else if(i===9){rect(-8,-3,55,7,'#8c4d46');rect(34,-8,11,17,'#e4bd78');rect(47,-10,14,21,'#e56d3e');rect(51,-8,7,16,'#ffbc61');rect(59,-4,6,8,'#ffe3a0');}
   else if(i===10){rect(-8,-3,58,6,'#6e8c69');rect(36,-14,18,27,'#72bba5');rect(41,-9,8,17,'#c9f7db');line(56,-14,65,-4,3,'#dcffe5');line(57,0,69,0,3,'#dcffe5');line(56,13,65,4,3,'#dcffe5');}
-  else if(i===11){rect(-11,-7,47,13,'#766479');rect(13,-14,25,21,'#bb80a7');rect(18,-10,7,7,'#efd2e2');rect(30,-6,5,5,'#efd2e2');rect(36,-4,16,7,'#d1b6d8');}
-  else if(i===13||i===14){rect(-8,-3,57,7,i===13?'#527890':'#695774');rect(34,-7,9,15,'#d6e2d9');rect(45,-11,16,22,i===13?'#7ad9f0':'#e5c772');rect(49,-7,8,14,i===13?'#dcfbff':'#fff3b4');rect(59,-3,6,6,'#f7ffff');}
+  else if(i===11){rect(-8,-4,22,8,'#766242');rect(10,-5,7,10,'#d3c08b');line(16,0,52,-7,6,'#568761');line(52,-7,89,-2,4,'#8cc077');line(89,-2,111,-14,3,'#b6d989');rect(58,-12,7,8,'#b5dd91');rect(83,-8,6,7,'#d7e7a4');}
+  else if(i===13||i===14||i===15){rect(-8,-3,57,7,i===13?'#527890':i===15?'#71466e':'#695774');rect(34,-7,9,15,'#d6e2d9');rect(45,-11,16,22,i===13?'#7ad9f0':i===15?'#d962ba':'#e5c772');rect(49,-7,8,14,i===13?'#dcfbff':i===15?'#ffe3fa':'#fff3b4');rect(59,-3,6,6,'#f7ffff');}
   else {rect(-7,-3,48,6,'#5e7780');rect(26,-15,15,29,'#a9d9e1');rect(29,-10,5,18,'#ecffff');ctx.fillStyle='#d9f7f8';ctx.beginPath();ctx.moveTo(41,-7);ctx.lineTo(57,0);ctx.lineTo(41,7);ctx.fill();}
   ctx.restore();
 }
@@ -687,7 +752,7 @@ function drawPlayer() {
 function drawHUD() {
   rect(18,18,240,66,'#10272be8');text(player.name.toUpperCase(),32,39,11,'#aac5b7');rect(32,49,176,12,'#3f4e48');rect(32,49,176*player.hp/100,12,player.hp>30?'#a2df7f':'#ed947d');text(String(player.hp),218,61,14);
   if(player.poison>0||player.chilled>0||player.shocked>0)text([player.poison>0?'POISONED':'',player.chilled>0?'CHILLED':'',player.shocked>0?'SHOCKED':''].filter(Boolean).join(' · '),25,97,12,'#ffdc9b');
-  rect(749,18,333,66,'#10272be8');text(training?'SAFE PRACTICE CAMP':`${biomes[region].name} · ${stageKills}/${biomes[region].goal} MONSTERS`,764,41,14,'#dceabf');text(training?'Practice with your rusty sword':biomes[stage]?.boss&&!bossDefeated?`The ${biomes[stage].bossName} guards the exit`:`${player.treasures}/${chestSpots.length} treasures · M opens map`,764,65,12,'#a9c6bb');
+  rect(749,18,333,66,'#10272be8');text(training?'SAFE PRACTICE CAMP':`${biomes[region].name} · ${stageKills}/${biomes[region].goal} MONSTERS`,764,41,14,'#dceabf');text(training?'Practice with your sword and Ice Staff':biomes[stage]?.boss&&!bossDefeated?`The ${biomes[stage].bossName} guards the exit`:`${player.treasures}/${chestSpots.length} treasures · M opens map`,764,65,12,'#a9c6bb');
   if(training){rect(18,100,350,123,'#10272bdc');text('Try your new moves',32,122,17,'#c8efa7');text(`${lessons.move?'✓':'○'} A / D move   ${lessons.jump?'✓':'○'} Space jump twice`,32,148,13);text(`${lessons.melee?'✓':'○'} J melee    Find stronger gear later`,32,174,13);text('ENTER: open the map →',32,202,13,'#ffdb93');}
   else {rect(334,25,358,7,'#153139');rect(334,25,358*(player.x-stage*LEVEL_LENGTH)/LEVEL_LENGTH,7,biomes[region].grass);text('START',334,51,9,'#d0e1c4');text('MIDPOINT',493,51,9,'#eac49b');text('EXIT GATE',633,51,9,'#b8deef');}
   const currentBoss=enemies.find(e=>e.boss&&e.hp>0);
@@ -713,10 +778,35 @@ function drawHUD() {
   rect(706,554,377,30,'#17323be8');text(player.powers.map((id,i)=>`${i?'F':'Q'} ${powers[id].name} ${player.powerCooldowns[id]>0?player.powerCooldowns[id].toFixed(1)+'s':'READY'}`).join('   ·   '),715,575,12,'#e8f7d5');
 }
 function hotbarEntries(){return player.loadouts[activeBar].map(weapon=>weapon===null?{kind:'empty'}:{kind:'weapon',weapon});}
+function drawShipScene(){
+  const s=ship;rect(0,0,W,H,'#123a5a');
+  for(let i=0;i<58;i++){const x=(i*191+57)%W,y=(i*137+s.scroll*(.55+i%3*.2))%H;rect(x,y,i%5===0?3:2,i%5===0?7:4,i%4===0?'#d5efff':'#8bbbd8');}
+  ctx.globalAlpha=.2;for(let i=0;i<8;i++){const x=(i*311+80)%W,y=(i*223+s.scroll*.6)%(H+130)-70;rect(x-40,y,105,18,'#d9edff');rect(x-15,y-12,70,18,'#d9edff');}ctx.globalAlpha=1;
+  for(const e of s.enemies){
+    const color=e.boss?'#ad5a85':'#d77b68',wing=e.boss?68:26;
+    rect(e.x-wing,e.y-4,wing*2,13,'#472f55');rect(e.x-wing+5,e.y-6,wing*2-10,9,color);
+    rect(e.x-12,e.y-22,e.boss?24:20,e.boss?66:42,color);rect(e.x-7,e.y-6,14,16,'#ffc7a4');
+    rect(e.x-wing+4,e.y+8,14,7,'#e7aa87');rect(e.x+wing-18,e.y+8,14,7,'#e7aa87');
+    if(e.boss){rect(e.x-57,e.y-65,114,10,'#1c2b3d');rect(e.x-55,e.y-63,110*e.hp/e.max,6,'#ef96ad');text('SKY ACE',e.x-36,e.y-72,13,'#fff2d9');}
+  }
+  for(const b of s.shots){rect(b.x-3,b.y-11,6,17,'#ffe8a5');rect(b.x-1,b.y-14,2,7,'#fffaff');}
+  for(const b of s.enemyShots){rect(b.x-5,b.y-5,10,10,'#ff966f');rect(b.x-2,b.y-2,4,4,'#ffe2a0');}
+  if(s.inv<=0||Math.floor(s.elapsed*12)%2===0){
+    const x=s.x,y=s.y,cloak=player.look==='storm'?'#719bbf':player.look==='ember'?'#c78061':'#72aa7b';
+    rect(x-40,y+2,80,15,'#264958');rect(x-36,y-2,72,13,'#b6d6d6');rect(x-18,y-25,36,65,'#294b5c');rect(x-12,y-30,24,65,'#d9e6da');
+    rect(x-9,y-14,18,22,'#538297');rect(x-7,y-10,14,14,cloak);rect(x-5,y-8,10,9,'#e4bd8d');rect(x-6,y-11,12,4,'#5b463d');
+    rect(x-28,y+31,56,9,'#406778');rect(x-9,y-39,18,15,'#ecf2d9');rect(x-13,y+39,26,7,'#97b9c4');
+  }
+  rect(18,18,330,80,'#0d293ddc');text('SKY RUN · TOP-DOWN FLIGHT',32,42,16,'#e9faff');text(`HULL ${s.hp}    DRONES ${s.kills}/${SKY_GOAL}`,32,70,17,'#d5f1c2');
+  if(s.elapsed<5)text('WASD / ARROWS TO FLY · J / SPACE TO SHOOT',360,120,18,'#fff1c7');
+  else text(s.bossSpawned?'DEFEAT THE SKY ACE':'CLEAR THE SQUADRON',405,48,16,'#e4f5ff');
+  if(mobileHud)mobileHud.textContent=`✈ HULL ${s.hp} · ${s.kills}/${SKY_GOAL} DRONES${s.bossSpawned?' · SKY ACE':''}`;
+}
 function draw() {
+  if(ship&&['ship','ship-pause','win','over'].includes(state)){drawShipScene();return;}
   ctx.imageSmoothingEnabled=false;drawBackground();ctx.save();ctx.beginPath();ctx.rect(0,0,W,583);ctx.clip();ctx.translate(-Math.round(camera),0);
   drawScenery();drawLoot();for(const e of enemies)drawEnemy(e);drawPlayer();
-  for(const b of bullets)line(b.x-b.vx*.012,b.y-b.vy*.012,b.x,b.y,b.effect?7:3,b.color||'#ffe1a0');
+  for(const b of bullets){line(b.x-b.vx*.02,b.y-b.vy*.02,b.x,b.y,b.effect==='laser'?5:b.effect?7:3,b.color||'#ffe1a0');if(b.effect==='freeze')rect(b.x-4,b.y-4,8,8,'#ebffff');if(b.effect==='burn')rect(b.x-3,b.y-3,6,6,'#ffe7a3');if(b.effect==='laser')rect(b.x-3,b.y-3,6,6,'#fff0ff');}
   for(const b of enemyShots){rect(b.x-12,b.y-12,24,24,b.effect==='shock'?'#345d78':b.color?'#8c493f':'#794b99');rect(b.x-9,b.y-9,18,18,b.color||'#d89cea');rect(b.x-4,b.y-4,8,8,b.effect==='shock'?'#f0ffff':b.color?'#ffe3a0':'#fff0ff');}
   for(const w of waves){const r=w.radius*(1-w.life/.38);line(w.x-r,w.y-3,w.x+r,w.y-3,5*w.life/.38,'#dcc1fc');for(let i=-1;i<=1;i+=2)line(w.x+i*r,w.y,w.x+i*(r+8),w.y-12,3,'#f1ddff');}
   for(const s of sparks)rect(s.x,s.y,4,4,s.color);
@@ -727,9 +817,11 @@ function draw() {
   if(mobileHud)mobileHud.textContent=`♥ ${player.hp}   ${weapons[player.weapon].name}   ${player.powers.map((id,i)=>`${i?'F':'Q'} ${powers[id].name}${player.powerCooldowns[id]>0?' '+Math.ceil(player.powerCooldowns[id]):''}`).join(' · ')}`;
 }
 function pause() {
-  if(state==='play'){state='pause';overlay.innerHTML='<small>TAKE A BREATHER</small><h2>Adventure paused.</h2><p>Press P or click below to continue.</p><button id="resume">Keep exploring →</button>';overlay.classList.remove('hidden');document.querySelector('#resume').onclick=pause;}
+  if(state==='ship'){state='ship-pause';overlay.innerHTML='<small>SKY RUN PAUSED</small><h2>Take a breather.</h2><p>Press P or click below to keep flying.</p><button id="resume">Keep flying →</button>';overlay.classList.remove('hidden');document.querySelector('#resume').onclick=pause;}
+  else if(state==='ship-pause'){state='ship';overlay.classList.add('hidden');canvas.focus();}
+  else if(state==='play'){state='pause';overlay.innerHTML='<small>TAKE A BREATHER</small><h2>Adventure paused.</h2><p>Press P or click below to continue.</p><button id="resume">Keep exploring →</button>';overlay.classList.remove('hidden');document.querySelector('#resume').onclick=pause;}
   else if(state==='pause'){state='play';overlay.classList.add('hidden');canvas.focus();}
-  keys.clear();mouse.down=false;activeAimPointer=null;mobileAim=null;canvasTouch=null;touchGestures.clear();
+  keys.clear();mouse.down=false;activeAimPointer=null;mobileAim=null;canvasTouch=null;laserHeld=false;touchGestures.clear();
 }
 function pointerPosition(e){const r=canvas.getBoundingClientRect();mouse.x=(e.clientX-r.left)*W/r.width;mouse.y=(e.clientY-r.top)*H/r.height;}
 function hotbarClick(x,y){if(y<614||y>689)return false;if(x>=940){if(y<650)heal();return true;}if(x>=844){if(y<650)switchBar();else openInventory();return true;}const i=Math.floor((x-18)/116);if(i>=0&&i<7)selectHotbarSlot(i);return true;}
@@ -739,8 +831,14 @@ function bindMobileControls(){
   for(const button of controls){
     let heldPointer=null,startX=0,startY=0;
     button.addEventListener('pointerdown',e=>{
-      if(state!=='play')return;e.preventDefault();e.stopPropagation();heldPointer=e.pointerId;button.setPointerCapture?.(e.pointerId);button.classList.add('pressed');
+      if(state!=='play'&&state!=='ship')return;e.preventDefault();e.stopPropagation();heldPointer=e.pointerId;button.setPointerCapture?.(e.pointerId);button.classList.add('pressed');
       const action=button.dataset.control;
+      if(state==='ship'){
+        if(['left','right','up','down'].includes(action))keys.add({left:'a',right:'d',up:'w',down:'s'}[action]);
+        else if(action==='attack'){mouse.down=true;shootShip();}
+        else if(action==='pause')pause();
+        return;
+      }
       if(action==='left'||action==='right'){keys.add(action==='left'?'a':'d');}
       else if(action==='jump')jump();
       else if(action==='attack'){activeAimPointer=e.pointerId;startX=e.clientX;startY=e.clientY;mobileAim={x:player.face*200,y:0};mouse.down=true;attack();}
@@ -759,7 +857,8 @@ function bindMobileControls(){
     }});
     const release=e=>{if(e.pointerId!==heldPointer)return;button.classList.remove('pressed');heldPointer=null;
       if(button.dataset.control==='left')keys.delete('a');if(button.dataset.control==='right')keys.delete('d');
-      if(button.dataset.control==='attack'){mouse.down=false;mobileAim=null;activeAimPointer=null;}
+      if(button.dataset.control==='up')keys.delete('w');if(button.dataset.control==='down')keys.delete('s');
+      if(button.dataset.control==='attack'){mouse.down=false;mobileAim=null;activeAimPointer=null;laserHeld=false;}
     };
     button.addEventListener('pointerup',release);button.addEventListener('pointercancel',release);button.addEventListener('lostpointercapture',release);
   }
@@ -769,6 +868,7 @@ function bindInputs() {
   document.querySelector('#sound').onclick=()=>{sound=!sound;document.querySelector('#sound').textContent=`Sound: ${sound?'on':'off'}`;tone(500);};
   window.addEventListener('keydown',e=>{
     const k=e.key.toLowerCase();if([' ','arrowup','arrowleft','arrowright','arrowdown'].includes(k))e.preventDefault();if(e.repeat)return;
+    if(state==='ship'||state==='ship-pause'){if(k==='p')pause();else if(state==='ship')keys.add(k);return;}
     if(k==='i'||k==='escape'&&state==='inventory'){if(state==='inventory')closeInventory();else openInventory();return;}
     if(state==='inventory')return;
     keys.add(k);
@@ -779,8 +879,8 @@ function bindInputs() {
     if(k==='m'&&state==='play'&&!training)showMap();
     if(k==='p')pause();if(k==='r'&&(state==='over'||state==='win'))start();
   });
-  window.addEventListener('keyup',e=>{const k=e.key.toLowerCase();keys.delete(k);if([' ','w','arrowup'].includes(k)&&player.vy<-180)player.vy*=.6;});
-  window.addEventListener('blur',()=>{if(state==='play')pause();keys.clear();mouse.down=false;activeAimPointer=null;mobileAim=null;canvasTouch=null;touchGestures.clear();});
+  window.addEventListener('keyup',e=>{const k=e.key.toLowerCase();keys.delete(k);if(k==='j'&&!mouse.down)laserHeld=false;if(state==='play'&&[' ','w','arrowup'].includes(k)&&player.vy<-180)player.vy*=.6;});
+  window.addEventListener('blur',()=>{if(state==='play'||state==='ship')pause();keys.clear();mouse.down=false;activeAimPointer=null;mobileAim=null;canvasTouch=null;laserHeld=false;touchGestures.clear();});
   // Capture touch gestures before a control button can stop propagation.
   window.addEventListener('pointerdown',e=>{
     if(e.pointerType==='touch'&&state==='play')touchGestures.set(e.pointerId,{x:e.clientX,y:e.clientY,swiped:!!e.target?.closest?.('[data-control="jump"]')});
@@ -796,7 +896,7 @@ function bindInputs() {
     }
   },true);
   canvas.addEventListener('pointermove',e=>{if(activeAimPointer===null||activeAimPointer===e.pointerId)pointerPosition(e);});
-  canvas.addEventListener('pointerdown',e=>{if(e.button!==0||state!=='play')return;e.preventDefault();pointerPosition(e);canvas.focus();if(hotbarClick(mouse.x,mouse.y))return;activeAimPointer=e.pointerId;canvas.setPointerCapture?.(e.pointerId);
+  canvas.addEventListener('pointerdown',e=>{if(e.button!==0||state!=='play'&&state!=='ship')return;e.preventDefault();pointerPosition(e);canvas.focus();if(state==='ship'){activeAimPointer=e.pointerId;canvas.setPointerCapture?.(e.pointerId);mouse.down=true;shootShip();return;}if(hotbarClick(mouse.x,mouse.y))return;activeAimPointer=e.pointerId;canvas.setPointerCapture?.(e.pointerId);
     if(e.pointerType==='touch')canvasTouch={pointerId:e.pointerId,age:0,held:false,swiped:false};
     else mouse.down=true;
   });
@@ -805,7 +905,7 @@ function bindInputs() {
       if(canvasTouch?.pointerId===e.pointerId&&!cancelled&&!canvasTouch.held&&!canvasTouch.swiped&&state==='play'){
         pointerPosition(e);attack(true);
       }
-      mouse.down=false;mobileAim=null;activeAimPointer=null;canvasTouch=null;
+      mouse.down=false;mobileAim=null;activeAimPointer=null;canvasTouch=null;laserHeld=false;
     }
     touchGestures.delete(e.pointerId);
   };
@@ -814,6 +914,7 @@ function bindInputs() {
 }
 reset();
 document.querySelector('.mobile-right')?.insertAdjacentHTML?.('beforeend','<button data-control="power1" aria-label="Cast first magic power">Q Magic</button><button data-control="power2" aria-label="Cast second magic power">F Magic</button>');
+document.querySelector('.mobile-left')?.insertAdjacentHTML?.('beforeend','<button data-control="up" aria-label="Fly up">▲</button><button data-control="down" aria-label="Fly down">▼</button>');
 bindInputs();showCharacterCreator();
-function frame(now){const dt=Math.min((now-last)/1000,.033);last=now;if(state==='play')update(dt);draw();requestAnimationFrame(frame);}
+function frame(now){const dt=Math.min((now-last)/1000,.033);last=now;if(state==='play')update(dt);else if(state==='ship')updateShip(dt);draw();requestAnimationFrame(frame);}
 requestAnimationFrame(frame);

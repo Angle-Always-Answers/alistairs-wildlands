@@ -5,7 +5,8 @@ const {createCanvas,loadImage}=require(process.argv[2]||'@napi-rs/canvas');
 (async()=>{
   const canvas=createCanvas(1100,700);canvas.focus=()=>{};canvas.addEventListener=()=>{};
   const element={classList:{add(){},remove(){}},focus(){},querySelectorAll(){return []}};
-  const box={document:{querySelector:s=>s==='#game'?canvas:element,querySelectorAll(){return []}},window:{addEventListener(){}},requestAnimationFrame(){},console,Math};
+  const creator=Object.fromEntries(['#hero-name','#hero-look','#hero-power-1','#hero-power-2'].map(id=>[id,{value:''}]));
+  const box={document:{querySelector:s=>s==='#game'?canvas:creator[s]||element,querySelectorAll(){return []}},window:{addEventListener(){}},requestAnimationFrame(){},console,Math};
   vm.createContext(box);vm.runInContext(fs.readFileSync(path.join(__dirname,'game.js'),'utf8'),box);
   box.loaded={};for(const file of fs.readdirSync(path.join(__dirname,'assets/starter-pack')))if(file.endsWith('.png')&&!file.includes('source')&&!file.includes('sheet'))box.loaded[file.slice(0,-4)]=await loadImage(path.join(__dirname,'assets/starter-pack',file));
   for(const file of fs.readdirSync(path.join(__dirname,'assets/monsters')))if(file.endsWith('.png'))box.loaded[file.slice(0,-4)]=await loadImage(path.join(__dirname,'assets/monsters',file));
@@ -31,5 +32,7 @@ const {createCanvas,loadImage}=require(process.argv[2]||'@napi-rs/canvas');
     rctx.fillStyle='#e8f3e7';rctx.font='bold 16px sans-serif';rctx.fillText(name.toUpperCase().replace('-',' '),x+11,y+148);
   }
   fs.writeFileSync(path.join(dir,'monster-roster.png'),roster.toBuffer('image/png'));
-  console.log('Rendered practice, regions, melee animation, and monster roster to previews/.');
+  run('startSkyRun();ship.enemies.push({x:390,y:170,w:38,h:40,hp:30,maxHp:30,boss:false,phase:0,fireCooldown:1},{x:720,y:130,w:90,h:90,hp:300,maxHp:300,boss:true,phase:0,fireCooldown:1});draw()');
+  fs.writeFileSync(path.join(dir,'sky-run.png'),canvas.toBuffer('image/png'));
+  console.log('Rendered practice, regions, melee animation, monster roster, and Sky Run to previews/.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

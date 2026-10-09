@@ -1,7 +1,7 @@
 // Local playtest editor. It changes the running level and stores layouts in this browser.
 (() => {
   'use strict';
-  const STORAGE='alistairs-wildlands-editor-v1',VERSION=3;
+  const STORAGE='alistairs-wildlands-editor-v1',VERSION=4;
   const panel=document.querySelector('#level-editor'),frameElement=document.querySelector('.frame');
   const $=id=>document.querySelector('#'+id),clone=value=>JSON.parse(JSON.stringify(value));
   const bossFields=document.createElement('div');bossFields.id='editor-boss-fields';bossFields.innerHTML='<label>Boss health <input id="editor-boss-health" type="range" min="50" max="250" step="10"><output id="editor-boss-health-value"></output></label><label>Boss damage <input id="editor-boss-damage" type="range" min="50" max="250" step="10"><output id="editor-boss-damage-value"></output></label>';
@@ -49,10 +49,12 @@
     };
     if(savedVersion<2&&level===5&&!cleaned.camps.some(c=>Math.abs(c.x-(5*LEVEL_LENGTH+3590))<45))cleaned.camps.push(clone(source.camps.find(c=>c.x===5*LEVEL_LENGTH+3590)));
     if(savedVersion<3&&level===5)for(const trap of source.traps.filter(t=>[3860,4050,4500].includes(t.x-5*LEVEL_LENGTH)))if(!cleaned.traps.some(t=>Math.abs(t.x-trap.x)<45))cleaned.traps.push(clone(trap));
+    if(savedVersion<4&&level===5)for(const item of cleaned.loot)if(item.type==='weapon'&&item.weapon===13&&Math.abs(item.x-(5*LEVEL_LENGTH+2200))<45)item.type='weapon-upgrade';
+    if(savedVersion<4&&level===8&&!cleaned.loot.some(item=>item.type==='weapon'&&item.weapon===15))cleaned.loot.push(clone(source.loot.find(item=>item.type==='weapon'&&item.weapon===15)));
     return cleaned;
   }
   let edits={};
-  try {const saved=JSON.parse(window.localStorage?.getItem(STORAGE)||'null');if([1,2,VERSION].includes(saved?.version)&&saved.levels&&typeof saved.levels==='object')for(let level=0;level<biomes.length;level++)if(saved.levels[level]){const clean=cleanLevel(level,saved.levels[level],saved.version);if(clean)edits[level]=clean;}}catch{}
+  try {const saved=JSON.parse(window.localStorage?.getItem(STORAGE)||'null');if([1,2,3,VERSION].includes(saved?.version)&&saved.levels&&typeof saved.levels==='object')for(let level=0;level<biomes.length;level++)if(saved.levels[level]){const clean=cleanLevel(level,saved.levels[level],saved.version);if(clean)edits[level]=clean;}}catch{}
   const save=()=>{try{window.localStorage?.setItem(STORAGE,JSON.stringify({version:VERSION,levels:edits}));return true;}catch{return false;}};
   const replaceStage=(array,level,predicate,items)=>array.splice(0,array.length,...array.filter(item=>!predicate(item,level)),...clone(items));
   function applyStage(level,data,previous=null){
@@ -161,7 +163,7 @@
   $('editor-undo').onclick=()=>{if(!undo.length)return;const before=clone(draft);draft=undo.pop();selected=null;applyStage(stage,draft,before);edits[stage]=clone(draft);save();refresh();status('Last edit undone.');};
   $('editor-reset').onclick=()=>mutate(()=>{draft=clone(defaults[stage]);selected=null;});
   $('editor-export').onclick=()=>{const blob=new Blob([JSON.stringify({version:VERSION,game:'Alistairs Wildlands',levels:edits},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='wildlands-level-edits.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);status('Level edits exported as JSON.');};
-  $('editor-import').onchange=async event=>{const file=event.target.files?.[0];if(!file)return;try{const imported=JSON.parse(await file.text());if(![1,2,VERSION].includes(imported.version)||!imported.levels||typeof imported.levels!=='object')throw Error('Wrong file format');const next={};for(let level=0;level<biomes.length;level++)if(imported.levels[level]){const cleaned=cleanLevel(level,imported.levels[level],imported.version);if(cleaned)next[level]=cleaned;}const previous=edits;edits=next;for(let level=0;level<biomes.length;level++)applyStage(level,edits[level]||defaults[level],previous[level]||defaults[level]);draft=clone(edits[stage]||defaults[stage]);undo=[];selected=null;save();refresh();status('Edits imported. Resume to try them; pickups in this session may refresh.');}catch{status('Could not import that edits file.');}event.target.value='';};
+  $('editor-import').onchange=async event=>{const file=event.target.files?.[0];if(!file)return;try{const imported=JSON.parse(await file.text());if(![1,2,3,VERSION].includes(imported.version)||!imported.levels||typeof imported.levels!=='object')throw Error('Wrong file format');const next={};for(let level=0;level<biomes.length;level++)if(imported.levels[level]){const cleaned=cleanLevel(level,imported.levels[level],imported.version);if(cleaned)next[level]=cleaned;}const previous=edits;edits=next;for(let level=0;level<biomes.length;level++)applyStage(level,edits[level]||defaults[level],previous[level]||defaults[level]);draft=clone(edits[stage]||defaults[stage]);undo=[];selected=null;save();refresh();status('Edits imported. Resume to try them; pickups in this session may refresh.');}catch{status('Could not import that edits file.');}event.target.value='';};
   window.drawLevelEditorGuides=()=>{
     if(state!=='editor'||!draft)return;
     ctx.save();ctx.lineWidth=3;ctx.font='bold 12px Segoe UI, sans-serif';
