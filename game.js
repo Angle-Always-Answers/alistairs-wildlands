@@ -57,14 +57,14 @@ const chestSpots=[[[790,350],[2190,230]],[[1110,280],[2470,245]],[[1700,340],[36
 const traps=[['thorns',[1230,2590,3920]],['spikes',[1500,2880,4050]],['thorns',[950,2600,4080]],['thorns',[1200,2750,3900]],['crystal-trap',[800,2380,4000]],['crystal-trap',[900,2220,3550,4250]],['spikes',[1150,2530,3990]],['crystal-trap',[1250,2790,4110]],['spikes',[990,2430,4070]],['spikes',[1130,2660,3980]]].flatMap(([kind,spots],i)=>spots.map(x=>({x:i*LEVEL_LENGTH+x,kind,w:56,h:25})));
 const monsterStats={
   slime:{hp:44,w:34,h:28,speed:68,damage:8,color:'#a0d65a'},
-  bat:{hp:40,w:34,h:26,speed:105,damage:9,flying:true,color:'#d394ef'},
+  bat:{hp:40,w:34,h:26,speed:72,damage:8,flying:true,color:'#d394ef'},
   mushroom:{hp:58,w:34,h:32,speed:62,damage:9,hop:true,color:'#d57c99'},
   wolf:{hp:78,w:43,h:31,speed:155,damage:12,charge:true,color:'#a6b8b6'},
   beetle:{hp:110,w:42,h:32,speed:72,damage:13,color:'#d5a176'},
   scorpion:{hp:100,w:46,h:29,speed:104,damage:15,charge:true,color:'#dfb36c'},
-  wisp:{hp:95,w:35,h:34,speed:128,damage:12,flying:true,color:'#9edfe1'},
+  wisp:{hp:95,w:35,h:34,speed:82,damage:10,flying:true,color:'#9edfe1'},
   golem:{hp:175,w:52,h:48,speed:53,damage:19,color:'#94aeb5'},
-  sandjaw:{hp:520,w:76,h:62,speed:116,damage:18,boss:true,color:'#e5b477'},
+  sandjaw:{hp:300,w:76,h:62,speed:88,damage:11,boss:true,color:'#e5b477'},
   warden:{hp:900,w:92,h:80,speed:126,damage:24,boss:true,color:'#bddcea'},
   titan:{hp:1180,w:108,h:104,speed:108,damage:28,boss:true,color:'#f2a76b'}
 };
@@ -105,6 +105,7 @@ function reset() {
     ...Array.from({length:72},(_,i)=>({x:LEVEL_LENGTH*3+500+i*460,y:FLOOR-25,type:'ammo'})),
     ...Array.from({length:49},(_,i)=>({x:1200+i*950,y:FLOOR-28,type:'potion'}))
   ];
+  if(typeof window.applySavedLevelEdits==='function')window.applySavedLevelEdits();
   trainingLoot=[];
   keys.clear();mouse.down=false;activeAimPointer=null;mobileAim=null;canvasTouch=null;touchGestures.clear();
 }
@@ -143,7 +144,7 @@ function enterLevel(i) {
   if(i>unlockedStage)return;
   stage=i;region=i;stageKills=0;bossSpawned=false;bossDefeated=false;enemies=[];bullets=[];enemyShots=[];waves=[];sparks=[];labels=[];
   Object.assign(player,{x:i*LEVEL_LENGTH+90,y:FLOOR-42,vx:0,vy:0,hp:Math.min(100,player.hp+25),inv:0,attack:null,cool:0,jumps:0,jumpBuffer:0,coyote:0,ground:false,padCooldown:0});
-  camera=i*LEVEL_LENGTH;spawnTimer=2;state='play';overlay.classList.remove('map-open');overlay.classList.add('hidden');canvas.focus();
+  camera=i*LEVEL_LENGTH;spawnTimer=2.5;state='play';overlay.classList.remove('map-open');overlay.classList.add('hidden');canvas.focus();
   message(biomes[i].name+' — reach the far gate',player.x,player.y-55,'#fff2bc');
 }
 function finishLevel() {
@@ -247,7 +248,7 @@ function hit(e,damage) {
   e.hp-=damage;burst(e.x+e.w/2,e.y+e.h/2,e.color);
   if(e.hp<=0) {
     if(e.boss){bossDefeated=true;enemyShots=[];message(`${e.type==='titan'?'CINDER TITAN':e.type==='sandjaw'?'SANDJAW':'WARDEN'} DEFEATED! Reach the gate →`,e.x,e.y-35,'#d6ffea');burst(e.x,e.y,e.color,35);}
-    else {kills++;stageKills++;if(kills%2===0&&player.inventory.some(i=>weapons[i].gun&&!weapons[i].freeAmmo))loot.push({x:e.x,y:FLOOR-25,type:'ammo'});if(kills%4===0)loot.push({x:e.x+20,y:FLOOR-25,type:'potion'});
+    else {kills++;stageKills++;spawnTimer=Math.max(spawnTimer,1.8);if(kills%2===0&&player.inventory.some(i=>weapons[i].gun&&!weapons[i].freeAmmo))loot.push({x:e.x,y:FLOOR-25,type:'ammo'});if(kills%4===0)loot.push({x:e.x+20,y:FLOOR-25,type:'potion'});
       if(stageKills===biomes[stage].goal)message('EXIT GATE OPEN! Continue right →',player.x,player.y-55,'#baff99');}
     tone(560);
   }
@@ -263,15 +264,22 @@ function physics(o,dt) {
   if(o.vy>=0&&bottom<=landing+2&&o.y+o.h>=landing){o.y=landing-o.h;o.vy=0;o.ground=true;if(o===player)o.jumps=0;}
 }
 function spawn() {
+  if(enemies.some(e=>!e.boss&&e.hp>0&&Math.abs(e.x-player.x)<270))return false;
   const pool=biomes[stage].monsters,name=pool[Math.floor(Math.random()*pool.length)];
-  let x=player.x+(Math.random()<.25?-1:1)*(420+Math.random()*170);
-  x=Math.max(stage*LEVEL_LENGTH+70,Math.min((stage+1)*LEVEL_LENGTH-220,x));
-  spawnMonster(name,x);
+  for(let attempt=0;attempt<8;attempt++){
+    const side=player.x>(stage+1)*LEVEL_LENGTH-900?-1:player.x<stage*LEVEL_LENGTH+850?1:Math.random()<.2?-1:1;
+    let x=player.x+side*(580+Math.random()*180);
+    x=Math.max(stage*LEVEL_LENGTH+70,Math.min((stage+1)*LEVEL_LENGTH-220,x));
+    if(Math.abs(x-player.x)<450)continue;
+    if(enemies.some(e=>e.hp>0&&!e.boss&&Math.abs(e.x-x)<280))continue;
+    spawnMonster(name,x);return true;
+  }
+  return false;
 }
-function spawnMonster(name,x){const m=monsterStats[name];enemies.push({type:name,x,y:m.flying?FLOOR-170:FLOOR-m.h,w:m.w,h:m.h,hp:m.hp,max:m.hp,vx:0,vy:0,knockVx:0,flying:!!m.flying,phase:Math.random()*8,color:m.color,damage:m.damage,speed:m.speed,hop:m.hop,charge:m.charge,boss:!!m.boss,bossCooldown:1.2,leapCooldown:1.1,tell:0,attackIndex:0,dash:0,phaseTwo:false});}
+function spawnMonster(name,x){const m=monsterStats[name],b=!training&&stage>=0?biomes[stage]:null,hpScale=m.boss?(b?.bossHpScale||1):(b?.enemyHpScale||1),damageScale=m.boss?(b?.bossDamageScale||1):(b?.enemyDamageScale||1),speedScale=m.boss?1:m.flying?(b?.flyingSpeedScale||1):(b?.groundSpeedScale||1),hp=Math.round(m.hp*hpScale);enemies.push({type:name,x,y:m.flying?FLOOR-170:FLOOR-m.h,w:m.w,h:m.h,hp,max:hp,vx:0,vy:0,knockVx:0,flying:!!m.flying,phase:Math.random()*8,color:m.color,damage:Math.round(m.damage*damageScale),speed:m.speed*speedScale,hop:m.hop,charge:m.charge,boss:!!m.boss,bossCooldown:1.2,leapCooldown:1.1,tell:0,attackIndex:0,dash:0,phaseTwo:false,flightTell:0,flightDash:0,flightCooldown:1.1});}
 function sandjawSpray(e){
   const x=e.x+e.w/2,y=e.y+18,aim=Math.atan2(player.y+player.h/2-y,player.x+player.w/2-x),count=e.phaseTwo?5:3;
-  for(let i=0;i<count;i++){const a=aim+(i-(count-1)/2)*.18;enemyShots.push({x,y,vx:Math.cos(a)*390,vy:Math.sin(a)*390,r:8,life:2.7,damage:e.phaseTwo?13:10,color:'#dfb97a'});}
+  for(let i=0;i<count;i++){const a=aim+(i-(count-1)/2)*.18;enemyShots.push({x,y,vx:Math.cos(a)*320,vy:Math.sin(a)*320,r:8,life:2.7,damage:e.phaseTwo?9:7,color:'#dfb97a'});}
   burst(x,y,'#f1d19b',13);tone(175,.13);
 }
 function updateSandjaw(e,dt){
@@ -279,12 +287,12 @@ function updateSandjaw(e,dt){
   if(enraged&&!e.phaseTwo){e.phaseTwo=true;e.bossCooldown=.5;message('SANDJAW STIRS · WATCH ITS LEAP!',e.x,e.y-68,'#ffe0a7');}
   if(e.tell>0){e.tell=Math.max(0,e.tell-dt);e.vx*=Math.max(0,1-dt*8);if(e.tell===0){
     if(e.queuedAttack==='spray')sandjawSpray(e);
-    else {e.vy=enraged?-760:-690;e.vx=Math.sign(dx)*(enraged?450:360);e.ground=false;e.stomping=true;}
-    e.queuedAttack=null;e.bossCooldown=enraged?1.15:1.7;
+    else {e.vy=enraged?-700:-620;e.vx=Math.sign(dx)*(enraged?350:280);e.ground=false;e.stomping=true;}
+    e.queuedAttack=null;e.bossCooldown=enraged?1.6:2.2;
   }return;}
   if(e.stomping)return;
   e.bossCooldown=Math.max(0,e.bossCooldown-dt);
-  if(e.bossCooldown===0&&Math.abs(dx)<1200){e.queuedAttack=e.attackIndex++%2===0?'spray':'pounce';e.tell=e.queuedAttack==='spray'?.6:.55;message(e.queuedAttack==='spray'?'SAND SPRAY · DODGE!':'SANDJAW POUNCE!',e.x,e.y-60,'#ffe0a7');}
+  if(e.bossCooldown===0&&Math.abs(dx)<1200){e.queuedAttack=e.attackIndex++%2===0?'spray':'pounce';e.tell=e.queuedAttack==='spray'?.8:.7;message(e.queuedAttack==='spray'?'SAND SPRAY · DODGE!':'SANDJAW POUNCE!',e.x,e.y-60,'#ffe0a7');}
   e.vx+=(Math.sign(dx)*e.speed*(enraged?1.25:1)-e.vx)*Math.min(1,dt*3);
 }
 function wardenVolley(e) {
@@ -336,6 +344,17 @@ function updateTitan(e,dt){
   }
   e.vx+=(Math.sign(dx)*e.speed*(enraged?1.35:1)-e.vx)*Math.min(1,dt*3);
 }
+function updateFlying(e,dt){
+  e.flightCooldown=Math.max(0,e.flightCooldown-dt);
+  const hoverY=FLOOR-170+Math.sin(time*2.5+e.phase)*20;
+  if(e.flightTell>0){e.flightTell=Math.max(0,e.flightTell-dt);e.y+=(hoverY-e.y)*Math.min(1,dt*1.4);
+    if(e.flightTell===0){e.flightDash=.6;e.flightDir=Math.sign(player.x-e.x)||1;}
+  }else if(e.flightDash>0){e.flightDash=Math.max(0,e.flightDash-dt);e.x+=(e.flightDir*165+e.knockVx)*dt;e.y+=(e.flightTargetY-e.y)*Math.min(1,dt*2.1);}
+  else {const side=e.x<player.x?-1:1,targetX=player.x+side*115,step=Math.max(-e.speed*dt,Math.min(e.speed*dt,targetX-e.x));e.x+=step+e.knockVx*dt;e.y+=(hoverY-e.y)*Math.min(1,dt*1.15);
+    if(e.flightCooldown===0&&Math.abs(player.x-e.x)<135){e.flightTell=.85;e.flightTargetY=player.y+player.h/2-e.h/2;e.flightCooldown=3.6;message(e.type==='bat'?'BAT DIVE · MOVE!':'WISP DIVE · MOVE!',e.x,e.y-15,'#f2d4ff');burst(e.x+e.w/2,e.y+e.h/2,e.color,6);}
+  }
+  e.knockVx*=Math.max(0,1-dt*2.1);
+}
 function end(win) {
   state=win?'win':'over';
   overlay.classList.remove('map-open');
@@ -368,7 +387,7 @@ function update(dt) {
   if(keys.has('j')||mouse.down)attack(mouse.down);
   tickMelee(dt);
   spawnTimer-=dt;
-  if(!training&&spawnTimer<=0&&enemies.filter(e=>!e.boss).length<7&&stageKills<biomes[stage].goal){spawn();spawnTimer=2.0;}
+  if(!training&&spawnTimer<=0&&enemies.filter(e=>!e.boss&&e.hp>0).length<3&&stageKills<biomes[stage].goal){spawnTimer=spawn()?(biomes[stage].spawnSeconds||3.6):1.2;}
   if(!training&&stage===1&&!bossSpawned&&player.x>stage*LEVEL_LENGTH+3700){spawnMonster('sandjaw',stage*LEVEL_LENGTH+4200);bossSpawned=true;message('SANDJAW · THE RIDGE GUARDIAN',player.x,player.y-70,'#ffe0ad');}
   if(!training&&stage===5&&!bossSpawned&&player.x>stage*LEVEL_LENGTH+3700){spawnMonster('warden',stage*LEVEL_LENGTH+4200);bossSpawned=true;message('THE MOONSTONE WARDEN',player.x,player.y-70,'#eed2ff');}
   if(!training&&stage===biomes.length-1&&!bossSpawned&&player.x>stage*LEVEL_LENGTH+3700){spawnMonster('titan',stage*LEVEL_LENGTH+4200);bossSpawned=true;message('THE CINDER TITAN',player.x,player.y-70,'#ffd3a3');}
@@ -377,7 +396,7 @@ function update(dt) {
     if(e.dummy){e.flash=Math.max(0,(e.flash||0)-dt);continue;}
     e.trapCooldown=Math.max(0,(e.trapCooldown||0)-dt);
     const dir=Math.sign(player.x-e.x);
-    if(e.flying){e.x+=(dir*e.speed+e.knockVx)*dt;e.knockVx*=Math.max(0,1-dt*2.1);e.y+=(player.y-45+Math.sin(time*(e.type==='wisp'?5:3)+e.phase)*40-e.y)*dt*1.7;}
+    if(e.flying)updateFlying(e,dt);
     else {if(e.type==='sandjaw')updateSandjaw(e,dt);else if(e.type==='warden')updateWarden(e,dt);else if(e.type==='titan')updateTitan(e,dt);else {const rush=e.charge&&Math.sin(time*1.8+e.phase)>.65?1.65:1;e.vx+=(dir*e.speed*rush-e.vx)*dt*3;if(e.ground&&(e.hop?Math.random()<dt*2.2:Math.random()<dt*.7))e.vy=e.hop?-445:-340;}physics(e,dt);if(e.type==='sandjaw'&&e.stomping&&e.ground){e.stomping=false;burst(e.x+e.w/2,e.y+e.h,'#e9c48d',14);}if(e.type==='titan'&&e.stomping&&e.ground){e.stomping=false;titanShockwave(e);}}
     if(overlap(player,e)&&player.inv<=0){player.hp=Math.max(0,player.hp-e.damage);player.inv=1;player.vy=-220;burst(player.x,player.y,'#ffb195');tone(80,.13);}
   }
@@ -557,6 +576,7 @@ function drawEnemy(e) {
     if(e.flying){rect(e.x-12,e.y+Math.sin(time*20)*7,14,12,e.color);rect(e.x+28,e.y-Math.sin(time*20)*7,14,12,e.color);}
     rect(e.x,e.y+4,e.w,e.h-4,e.color);rect(e.x+5,e.y,e.w-10,8,e.color);rect(e.x+7,e.y+10,5,5,'#25394c');rect(e.x+22,e.y+10,5,5,'#25394c');
   }
+  if(e.flying&&e.flightTell>0){ctx.globalAlpha=.55+.35*Math.sin(time*18);rect(e.x-8,e.y-10,e.w+16,3,'#fff0a5');text('!',e.x+e.w/2-5,e.y-17,20,'#fff4b6');ctx.globalAlpha=1;}
   if(e.hp<e.max&&!e.boss){rect(e.x,e.y-10,e.w,4,'#243936');rect(e.x,e.y-10,e.w*e.hp/e.max,4,'#f7a090');}
 }
 // Weapons use the hand as their local origin, so every swing stays attached.
@@ -647,6 +667,7 @@ function draw() {
   for(const w of waves){const r=w.radius*(1-w.life/.38);line(w.x-r,w.y-3,w.x+r,w.y-3,5*w.life/.38,'#dcc1fc');for(let i=-1;i<=1;i+=2)line(w.x+i*r,w.y,w.x+i*(r+8),w.y-12,3,'#f1ddff');}
   for(const s of sparks)rect(s.x,s.y,4,4,s.color);
   for(const l of labels){ctx.globalAlpha=Math.min(1,l.life);text(l.text,l.x,l.y,14,l.color);}ctx.globalAlpha=1;
+  if(typeof window.drawLevelEditorGuides==='function')window.drawLevelEditorGuides();
   if(training){text('TRAINING TARGETS',545,FLOOR-68,12,'#ffe8ae');}
   ctx.restore();drawHUD();
   if(mobileHud)mobileHud.textContent=`♥ ${player.hp}   ${weapons[player.weapon].name}   ${player.ammo} ammo   ${player.potions} potions`;
@@ -672,6 +693,7 @@ function bindMobileControls(){
       else if(action==='heal')heal();
       else if(action==='map'){if(training)beginAdventure();else showMap();}
       else if(action==='inventory')openInventory();
+      else if(action==='edit')window.toggleLevelEditor?.();
       else if(action==='bar')switchBar();
       else if(action==='pause')pause();
       else if(action==='prev'||action==='next')cycleWeapon(action==='prev'?-1:1);

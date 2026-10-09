@@ -19,6 +19,7 @@ assert.equal(run('trainingLoot.length'),0);key('Enter');assert.equal(run('state'
 assert.equal(run('biomes.length'),10);assert.equal(run('WORLD'),48000);assert.equal(run('platformLayouts.length'),10);
 assert.deepEqual(Array.from(run('biomes.map((b,i)=>b.boss?i:null).filter(i=>i!==null)')),[1,5,9]);
 assert.ok(run('monsterStats.sandjaw.hp<monsterStats.warden.hp&&monsterStats.warden.hp<monsterStats.titan.hp'));
+assert.equal(run('monsterStats.sandjaw.hp'),300);assert.equal(run('monsterStats.sandjaw.damage'),11);
 assert.ok(run('biomes.every((_,i)=>loot.filter(l=>["weapon","upgrade","weapon-upgrade"].includes(l.type)&&Math.floor(l.x/LEVEL_LENGTH)===i).length===2)'));
 for(const [weapon,stage] of [[1,3],[4,6],[6,7],[2,8]])assert.equal(run(`Math.floor(loot.find(l=>l.type==='weapon'&&l.weapon===${weapon}).x/LEVEL_LENGTH)`),stage);
 const frozenTime=run('time');key('i');assert.equal(run('state'),'inventory');run('frame(100)');assert.equal(run('time'),frozenTime);key('i');
@@ -30,6 +31,11 @@ run('player.x=2538;player.y=528;player.vy=0;player.ground=true;update(.016)');as
 run('spawnTimer=999;enemies=[];player.x=1000;player.y=528;player.inv=2;spawnMonster("slime",1238);const trapMob=enemies[0];trapMob.ground=true;const trapMobHp=trapMob.hp;update(.016)');
 assert.equal(run('trapMob.hp'),run('trapMobHp')-35,'grounded monster takes trap damage');run('update(.016)');assert.equal(run('trapMob.hp'),run('trapMobHp')-35,'trap cooldown prevents instant repeat');
 run('enemies=[];spawnMonster("slime",1238);enemies[0].y=FLOOR-150;enemies[0].ground=false;const airborneHp=enemies[0].hp;update(.016)');assert.equal(run('enemies[0].hp'),run('airborneHp'),'floor trap misses airborne monster');
+run('enemies=[];player.x=1000;player.y=528;player.inv=100;spawnTimer=0;for(let i=0;i<450;i++)update(.016)');assert.ok(run('enemies.filter(e=>!e.boss).length<=3'),'spawns never form a large pack');
+run('enemies=[];spawnTimer=999;player.x=1000;player.y=300;spawnMonster("bat",player.x+125);const bat=enemies[0];bat.flightCooldown=0;bat.y=FLOOR-170;updateFlying(bat,.016);const warnedY=bat.flightTargetY;player.y=140;updateFlying(bat,.016)');
+assert.ok(run('bat.flightTell>.8'),'bat warns before diving');assert.equal(run('bat.flightTargetY'),run('warnedY'),'bat aims at the warned position rather than tracking a new jump');assert.ok(run('Math.abs(bat.y-(FLOOR-170))<3'),'bat cruises at a steady height during a jump');
+assert.equal(run('monsterStats.bat.speed'),72);assert.equal(run('monsterStats.wisp.speed'),82);
+run('enemies=[];player.x=LEVEL_LENGTH-175;const gateSpawned=spawn()');assert.equal(run('gateSpawned'),true,'players can still find monsters near a gate');assert.ok(run('player.x-enemies[0].x>=450'),'gate spawns appear well behind, not on the player');
 const finds=[[1500,3600],[1600,3600],[1200,3350],[1450,3420],[1600,3400],[1520,3340],[1540,3380],[1550,3380],[1580,3350],[1620,3400]];
 for(let level=0;level<10;level++){
   assert.equal(run('stage'),level);if(level>0)for(const offset of finds[level])pickup(level,offset);
