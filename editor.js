@@ -1,7 +1,7 @@
 // Local playtest editor. It changes the running level and stores layouts in this browser.
 (() => {
   'use strict';
-  const STORAGE='alistairs-wildlands-editor-v1';
+  const STORAGE='alistairs-wildlands-editor-v1',VERSION=2;
   const panel=document.querySelector('#level-editor'),frameElement=document.querySelector('.frame');
   const $=id=>document.querySelector('#'+id),clone=value=>JSON.parse(JSON.stringify(value));
   const bossFields=document.createElement('div');bossFields.id='editor-boss-fields';bossFields.innerHTML='<label>Boss health <input id="editor-boss-health" type="range" min="50" max="250" step="10"><output id="editor-boss-health-value"></output></label><label>Boss damage <input id="editor-boss-damage" type="range" min="50" max="250" step="10"><output id="editor-boss-damage-value"></output></label>';
@@ -33,12 +33,12 @@
     loot:clone(loot.filter(l=>inLevel(l.x,level))),
     goal:biome.goal,enemyHpScale:1,enemyDamageScale:1,bossHpScale:1,bossDamageScale:1,groundSpeedScale:1,flyingSpeedScale:1,spawnSeconds:3.6
   }));
-  function cleanLevel(level,raw){
+  function cleanLevel(level,raw,legacy=false){
     if(!raw||typeof raw!=='object')return null;
     const low=level*LEVEL_LENGTH,high=(level+1)*LEVEL_LENGTH-80,source=defaults[level];
     const cleanList=(name,limit,convert)=>Array.isArray(raw[name])?raw[name].slice(0,limit).map((item,i)=>convert(item,i)).filter(Boolean):clone(source[name]);
     const pos=(item)=>clamp(item.x,low+20,high);
-    return {
+    const cleaned={
       platforms:cleanList('platforms',35,(p,i)=>{if(!p||typeof p!=='object')return null;const w=clamp(p.w,80,400);return {editorId:safeId(p.editorId,`platform-${i}`),x:clamp(p.x,low+20,(level+1)*LEVEL_LENGTH-w-20),y:clamp(p.y,150,FLOOR-50),w,level};}),
       traps:cleanList('traps',25,(t,i)=>t&&['thorns','spikes','crystal-trap'].includes(t.kind)?{editorId:safeId(t.editorId,`trap-${i}`),x:pos(t),kind:t.kind,w:56,h:25}:null),
       pads:cleanList('pads',20,(p,i)=>p&&typeof p==='object'?{editorId:safeId(p.editorId,`pad-${i}`),x:pos(p)}:null),
@@ -47,10 +47,12 @@
       loot:cleanList('loot',120,(l,i)=>l&&['weapon','weapon-upgrade','upgrade','ammo','potion'].includes(l.type)?{editorId:safeId(l.editorId,`loot-${i}`),x:pos(l),y:clamp(l.y,160,FLOOR-15),type:l.type,weapon:['weapon','weapon-upgrade'].includes(l.type)?clamp(Math.floor(l.weapon),0,weapons.length-1):undefined}:null),
       goal:clamp(raw.goal??source.goal,1,40),enemyHpScale:clamp(raw.enemyHpScale??1,.5,2.5),enemyDamageScale:clamp(raw.enemyDamageScale??1,.5,2.5),bossHpScale:clamp(raw.bossHpScale??1,.5,2.5),bossDamageScale:clamp(raw.bossDamageScale??1,.5,2.5),groundSpeedScale:clamp(raw.groundSpeedScale??1,.5,1.5),flyingSpeedScale:clamp(raw.flyingSpeedScale??1,.5,1.5),spawnSeconds:clamp(raw.spawnSeconds??source.spawnSeconds,.8,5)
     };
+    if(legacy&&level===5&&!cleaned.camps.some(c=>Math.abs(c.x-(5*LEVEL_LENGTH+3590))<45))cleaned.camps.push(clone(source.camps.find(c=>c.x===5*LEVEL_LENGTH+3590)));
+    return cleaned;
   }
   let edits={};
-  try {const saved=JSON.parse(window.localStorage?.getItem(STORAGE)||'null');if(saved?.version===1&&saved.levels&&typeof saved.levels==='object')for(let level=0;level<biomes.length;level++)if(saved.levels[level]){const clean=cleanLevel(level,saved.levels[level]);if(clean)edits[level]=clean;}}catch{}
-  const save=()=>{try{window.localStorage?.setItem(STORAGE,JSON.stringify({version:1,levels:edits}));return true;}catch{return false;}};
+  try {const saved=JSON.parse(window.localStorage?.getItem(STORAGE)||'null');if([1,VERSION].includes(saved?.version)&&saved.levels&&typeof saved.levels==='object')for(let level=0;level<biomes.length;level++)if(saved.levels[level]){const clean=cleanLevel(level,saved.levels[level],saved.version===1);if(clean)edits[level]=clean;}}catch{}
+  const save=()=>{try{window.localStorage?.setItem(STORAGE,JSON.stringify({version:VERSION,levels:edits}));return true;}catch{return false;}};
   const replaceStage=(array,level,predicate,items)=>array.splice(0,array.length,...array.filter(item=>!predicate(item,level)),...clone(items));
   function applyStage(level,data,previous=null){
     replaceStage(platforms,level,(item,i)=>item.level===i,data.platforms);
@@ -157,8 +159,8 @@
   $('editor-pan-right').onclick=()=>{camera=clamp(camera+550,stage*LEVEL_LENGTH,(stage+1)*LEVEL_LENGTH-W);};
   $('editor-undo').onclick=()=>{if(!undo.length)return;const before=clone(draft);draft=undo.pop();selected=null;applyStage(stage,draft,before);edits[stage]=clone(draft);save();refresh();status('Last edit undone.');};
   $('editor-reset').onclick=()=>mutate(()=>{draft=clone(defaults[stage]);selected=null;});
-  $('editor-export').onclick=()=>{const blob=new Blob([JSON.stringify({version:1,game:'Alistairs Wildlands',levels:edits},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='wildlands-level-edits.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);status('Level edits exported as JSON.');};
-  $('editor-import').onchange=async event=>{const file=event.target.files?.[0];if(!file)return;try{const imported=JSON.parse(await file.text());if(imported.version!==1||!imported.levels||typeof imported.levels!=='object')throw Error('Wrong file format');const next={};for(let level=0;level<biomes.length;level++)if(imported.levels[level]){const cleaned=cleanLevel(level,imported.levels[level]);if(cleaned)next[level]=cleaned;}const previous=edits;edits=next;for(let level=0;level<biomes.length;level++)applyStage(level,edits[level]||defaults[level],previous[level]||defaults[level]);draft=clone(edits[stage]||defaults[stage]);undo=[];selected=null;save();refresh();status('Edits imported. Resume to try them; pickups in this session may refresh.');}catch{status('Could not import that edits file.');}event.target.value='';};
+  $('editor-export').onclick=()=>{const blob=new Blob([JSON.stringify({version:VERSION,game:'Alistairs Wildlands',levels:edits},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='wildlands-level-edits.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);status('Level edits exported as JSON.');};
+  $('editor-import').onchange=async event=>{const file=event.target.files?.[0];if(!file)return;try{const imported=JSON.parse(await file.text());if(![1,VERSION].includes(imported.version)||!imported.levels||typeof imported.levels!=='object')throw Error('Wrong file format');const next={};for(let level=0;level<biomes.length;level++)if(imported.levels[level]){const cleaned=cleanLevel(level,imported.levels[level],imported.version===1);if(cleaned)next[level]=cleaned;}const previous=edits;edits=next;for(let level=0;level<biomes.length;level++)applyStage(level,edits[level]||defaults[level],previous[level]||defaults[level]);draft=clone(edits[stage]||defaults[stage]);undo=[];selected=null;save();refresh();status('Edits imported. Resume to try them; pickups in this session may refresh.');}catch{status('Could not import that edits file.');}event.target.value='';};
   window.drawLevelEditorGuides=()=>{
     if(state!=='editor'||!draft)return;
     ctx.save();ctx.lineWidth=3;ctx.font='bold 12px Segoe UI, sans-serif';

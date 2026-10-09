@@ -40,7 +40,22 @@ const finds=[[1500,3600],[1600,3600],[1200,3350],[1450,3420],[1600,3400],[1520,3
 for(let level=0;level<10;level++){
   assert.equal(run('stage'),level);if(level>0)for(const offset of finds[level])pickup(level,offset);
   if(level===1){run('spawnTimer=999;enemies=[];spawnMonster("sandjaw",stage*LEVEL_LENGTH+4058);bossSpawned=true;player.x=stage*LEVEL_LENGTH+3800;player.y=528;player.inv=5;const sandjaw=enemies[0];sandjaw.ground=true;const sandjawHp=sandjaw.hp;update(.016)');assert.equal(run('sandjaw.hp'),run('sandjawHp')-25,'first boss takes trap damage');run('enemyShots=[];sandjaw.phaseTwo=true;sandjawSpray(sandjaw)');assert.equal(run('enemyShots.length'),5);}
-  if(level===5){run('spawnTimer=999;enemies=[];spawnMonster("warden",stage*LEVEL_LENGTH+4258);bossSpawned=true;player.x=stage*LEVEL_LENGTH+3900;player.y=528;player.inv=5;const warden=enemies[0];warden.ground=true;while(Math.sin((time+.016)*2.5+traps.find(t=>t.x===stage*LEVEL_LENGTH+4250).x)<=-.2)time+=.1;const wardenHp=warden.hp;update(.016)');assert.equal(run('warden.hp'),run('wardenHp')-25,'Warden takes crystal trap damage');run('enemyShots=[];warden.phaseTwo=true;wardenNova(warden)');assert.equal(run('enemyShots.length'),12);}
+  if(level===5){
+    assert.equal(run('monsterStats.warden.hp'),620);assert.equal(run('monsterStats.warden.damage'),15);
+    assert.ok(run('camps.some(c=>c.x===stage*LEVEL_LENGTH+3590)'),'rest stop is available before the Warden');
+    run('spawnTimer=999;enemies=[];player.x=stage*LEVEL_LENGTH+3710;player.y=528;player.inv=5;stageKills=0;bossSpawned=false;update(.016)');assert.equal(run('bossSpawned'),false,'Warden waits until the monster goal is complete');
+    run('spawnMonster("slime",player.x+220);stageKills=biomes[stage].goal;update(.016)');assert.equal(run('bossSpawned'),true);assert.equal(run('enemies.filter(e=>!e.boss).length'),0,'Warden fight starts without a monster pack');
+    run('spawnTimer=999;enemies=[];spawnMonster("warden",stage*LEVEL_LENGTH+4258);bossSpawned=true;player.x=stage*LEVEL_LENGTH+3900;player.y=528;player.inv=5;const warden=enemies[0];warden.ground=true;while(Math.sin((time+.016)*2.5+traps.find(t=>t.x===stage*LEVEL_LENGTH+4250).x)<=-.2)time+=.1;const wardenHp=warden.hp;update(.016)');
+    assert.equal(run('warden.hp'),run('wardenHp')-25,'Warden takes crystal trap damage');
+    run('enemyShots=[];warden.hp=warden.max;wardenVolley(warden)');assert.equal(run('enemyShots.length'),3);assert.equal(run('enemyShots[0].damage'),9);assert.equal(run('enemyShots[0].life'),2.1);assert.ok(run('Math.hypot(enemyShots[0].vx,enemyShots[0].vy)<400'),'volley travels at a dodgeable speed');
+    run('enemyShots=[];warden.hp=warden.max*.4;warden.phaseTwo=true;wardenVolley(warden)');assert.equal(run('enemyShots.length'),4);assert.equal(run('enemyShots[0].damage'),12);
+    run('enemyShots=[];wardenNova(warden)');assert.equal(run('enemyShots.length'),10);
+    run('enemyShots=[];warden.hp=warden.max;warden.x=stage*LEVEL_LENGTH+4100;warden.y=FLOOR-warden.h;warden.bossCooldown=999;warden.tell=0;warden.dash=0;player.x=stage*LEVEL_LENGTH+3990;player.y=528;player.inv=9;player.weapon=1;player.ammo=100;player.cool=0;player.attack=null;mouse.x=warden.x-camera+warden.w/2;mouse.y=warden.y+warden.h/2;const hpBeforePistol=warden.hp;attack(true);for(let i=0;i<20;i++)update(.016)');
+    assert.ok(run('warden.hp<hpBeforePistol'),'the pistol can reliably damage the Warden');
+    run('enemyShots=[];const cover=platforms.find(p=>p.level===stage);enemyShots.push({x:cover.x+15,y:cover.y+8,vx:0,vy:0,r:9,life:1,damage:9});update(.016)');
+    assert.equal(run('enemyShots.length'),0,'platforms block hostile projectiles');
+    run('player.y=180;warden.ground=true;warden.leapCooldown=0;warden.tell=0;warden.dash=0;updateWarden(warden,.016)');assert.ok(run('warden.vy<=-940'),'Warden can still reach elevated players');
+  }
   if(level===9){run('spawnTimer=999;enemies=[];spawnMonster("titan",stage*LEVEL_LENGTH+3988);bossSpawned=true;player.x=stage*LEVEL_LENGTH+3800;player.y=528;player.inv=5;const titan=enemies[0];titan.ground=true;const titanHp=titan.hp;update(.016)');assert.equal(run('titan.hp'),run('titanHp')-25,'final boss takes trap damage');run('enemyShots=[];titanShockwave(titan)');assert.equal(run('enemyShots.length'),2);}
   run('draw()');clearLevel();assert.equal(run('state'),level===9?'win':'map');if(level<9){assert.equal(run('unlockedStage'),level+1);run(`enterLevel(${level+1})`);}
 }

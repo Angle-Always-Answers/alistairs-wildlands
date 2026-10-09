@@ -65,7 +65,7 @@ const monsterStats={
   wisp:{hp:95,w:35,h:34,speed:82,damage:10,flying:true,color:'#9edfe1'},
   golem:{hp:175,w:52,h:48,speed:53,damage:19,color:'#94aeb5'},
   sandjaw:{hp:300,w:76,h:62,speed:88,damage:11,boss:true,color:'#e5b477'},
-  warden:{hp:900,w:92,h:80,speed:126,damage:24,boss:true,color:'#bddcea'},
+  warden:{hp:620,w:92,h:80,speed:104,damage:15,boss:true,color:'#bddcea'},
   titan:{hp:1180,w:108,h:104,speed:108,damage:28,boss:true,color:'#f2a76b'}
 };
 let training, lessons, player, enemies, bullets, enemyShots, loot, trainingLoot, sparks, labels, waves, chests, camps;
@@ -90,7 +90,7 @@ function reset() {
   enemies=[{x:565,y:FLOOR-46,w:32,h:46,hp:99999,max:99999,vx:0,vy:0,color:'#d8b178',dummy:true},
     {x:700,y:FLOOR-46,w:32,h:46,hp:99999,max:99999,vx:0,vy:0,color:'#d8b178',dummy:true}];
   bullets=[];enemyShots=[];sparks=[];labels=[];waves=[];kills=0;stageKills=0;completed=biomes.map(()=>false);unlockedStage=0;stage=-1;bossSpawned=false;bossDefeated=false;time=0;spawnTimer=3;camera=0;region=0;activeBar=0;selectedSlot=0;
-  chests=chestSpots.map(c=>({...c,opened:false}));camps=biomes.map((_,i)=>({x:i*LEVEL_LENGTH+2550,used:false}));
+  chests=chestSpots.map(c=>({...c,opened:false}));camps=biomes.map((_,i)=>({x:i*LEVEL_LENGTH+2550,used:false}));camps.push({x:5*LEVEL_LENGTH+3590,used:false});
   loot=[
     {x:1500,y:FLOOR-25,type:'weapon',weapon:7},{x:3600,y:FLOOR-25,type:'weapon',weapon:8},
     {x:LEVEL_LENGTH+1600,y:FLOOR-25,type:'weapon',weapon:9},{x:LEVEL_LENGTH+3600,y:FLOOR-25,type:'weapon',weapon:3},
@@ -246,6 +246,7 @@ function knockback(e,dir,force,lift=90) {
 function hit(e,damage) {
   if(e.dummy){e.flash=.15;burst(e.x+15,e.y+15,'#efd6a1',5);message(`${damage}`,e.x,e.y-12,'#ffe5a7');tone(420);return;}
   e.hp-=damage;burst(e.x+e.w/2,e.y+e.h/2,e.color);
+  if(e.boss&&damage>0&&(e.hitLabelCooldown||0)<=0){message(`-${Math.round(damage)}  ${Math.max(0,Math.round(e.hp))}/${e.max}`,e.x+e.w/2,e.y-18,'#f8e9b7');e.hitLabelCooldown=.2;}
   if(e.hp<=0) {
     if(e.boss){bossDefeated=true;enemyShots=[];message(`${e.type==='titan'?'CINDER TITAN':e.type==='sandjaw'?'SANDJAW':'WARDEN'} DEFEATED! Reach the gate →`,e.x,e.y-35,'#d6ffea');burst(e.x,e.y,e.color,35);}
     else {kills++;stageKills++;spawnTimer=Math.max(spawnTimer,1.8);if(kills%2===0&&player.inventory.some(i=>weapons[i].gun&&!weapons[i].freeAmmo))loot.push({x:e.x,y:FLOOR-25,type:'ammo'});if(kills%4===0)loot.push({x:e.x+20,y:FLOOR-25,type:'potion'});
@@ -297,25 +298,25 @@ function updateSandjaw(e,dt){
 }
 function wardenVolley(e) {
   const x=e.x+e.w/2,y=e.y+e.h*.37,aim=Math.atan2(player.y+player.h/2-y,player.x+player.w/2-x);
-  const furious=e.hp<e.max*.5,count=furious?5:3,speed=furious?495:435;
-  for(let i=0;i<count;i++){const angle=aim+(i-(count-1)/2)*.17;enemyShots.push({x,y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,r:10,life:3.2,damage:furious?17:14});}
+  const furious=e.hp<e.max*.5,count=furious?4:3,speed=furious?360:315;
+  for(let i=0;i<count;i++){const angle=aim+(i-(count-1)/2)*.15;enemyShots.push({x,y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,r:9,life:2.1,damage:furious?12:9});}
   burst(x,y,'#e5a6f0',16);tone(180,.16);
 }
 function wardenNova(e) {
   const x=e.x+e.w/2,y=e.y+e.h/2;
-  for(let i=0;i<12;i++){const angle=i*Math.PI/6+time*.3;enemyShots.push({x,y,vx:Math.cos(angle)*365,vy:Math.sin(angle)*365,r:11,life:2.8,damage:19});}
+  for(let i=0;i<10;i++){const angle=i*Math.PI/5+time*.3;enemyShots.push({x,y,vx:Math.cos(angle)*275,vy:Math.sin(angle)*275,r:9,life:1.9,damage:12});}
   burst(x,y,'#ffd4f8',26);tone(95,.22);
 }
 function updateWarden(e,dt) {
   const furious=e.hp<e.max*.5,dx=player.x+player.w/2-(e.x+e.w/2);
-  if(furious&&!e.phaseTwo){e.phaseTwo=true;e.bossCooldown=.55;message('WARDEN ENRAGED · WATCH FOR NOVA!',e.x,e.y-82,'#ffe0f6');burst(e.x+e.w/2,e.y+e.h/2,'#f4b4ed',30);}
+  if(furious&&!e.phaseTwo){e.phaseTwo=true;e.bossCooldown=.8;message('WARDEN ENRAGED · WATCH FOR NOVA!',e.x,e.y-82,'#ffe0f6');burst(e.x+e.w/2,e.y+e.h/2,'#f4b4ed',30);}
   e.leapCooldown=Math.max(0,e.leapCooldown-dt);
-  if(e.tell>0){e.tell=Math.max(0,e.tell-dt);e.vx*=Math.max(0,1-dt*8);if(e.tell===0){if(e.queuedAttack==='volley')wardenVolley(e);else if(e.queuedAttack==='nova')wardenNova(e);else e.dash=.52;e.queuedAttack=null;e.bossCooldown=furious?1.1:1.85;}return;}
-  if(e.dash>0){e.dash=Math.max(0,e.dash-dt);e.vx=e.dashDir*(furious?620:500);return;}
+  if(e.tell>0){e.tell=Math.max(0,e.tell-dt);e.vx*=Math.max(0,1-dt*8);if(e.tell===0){if(e.queuedAttack==='volley')wardenVolley(e);else if(e.queuedAttack==='nova')wardenNova(e);else e.dash=.4;e.queuedAttack=null;e.bossCooldown=furious?1.8:2.4;}return;}
+  if(e.dash>0){e.dash=Math.max(0,e.dash-dt);e.vx=e.dashDir*(furious?460:380);return;}
   e.bossCooldown=Math.max(0,e.bossCooldown-dt);
-  if(e.ground&&e.leapCooldown===0&&player.y+player.h<e.y+25){e.vy=furious?-1010:-940;e.ground=false;e.leapCooldown=furious?2.2:3.2;burst(e.x+e.w/2,e.y+e.h,'#bcecff',10);}
-  if(e.bossCooldown===0&&Math.abs(dx)<1350){e.queuedAttack=furious&&e.attackIndex%3===2?'nova':Math.abs(dx)>270||player.y<e.y-55||e.attackIndex%2===0?'volley':'dash';e.attackIndex++;e.tell=e.queuedAttack==='nova'?1.1:e.queuedAttack==='volley'?.72:.55;e.dashDir=Math.sign(dx)||1;message(e.queuedAttack==='nova'?'CRYSTAL NOVA · MOVE!':e.queuedAttack==='volley'?'CRYSTAL VOLLEY!':'WARDEN CHARGE!',e.x,e.y-65,'#ffc5f7');}
-  const dir=Math.sign(dx);e.vx+=(dir*e.speed*(furious?1.25:1)-e.vx)*Math.min(1,dt*4);
+  if(e.ground&&e.leapCooldown===0&&player.y+player.h<e.y+25){e.vy=furious?-1010:-940;e.ground=false;e.leapCooldown=furious?3.2:4;burst(e.x+e.w/2,e.y+e.h,'#bcecff',10);}
+  if(e.bossCooldown===0&&Math.abs(dx)<1050){e.queuedAttack=furious&&e.attackIndex%3===2?'nova':Math.abs(dx)>270||player.y<e.y-55||e.attackIndex%2===0?'volley':'dash';e.attackIndex++;e.tell=e.queuedAttack==='nova'?1.25:e.queuedAttack==='volley'?.95:.8;e.dashDir=Math.sign(dx)||1;message(e.queuedAttack==='nova'?'CRYSTAL NOVA · MOVE!':e.queuedAttack==='volley'?'CRYSTAL VOLLEY!':'WARDEN CHARGE!',e.x,e.y-65,'#ffc5f7');}
+  const dir=Math.sign(dx);e.vx+=(dir*e.speed*(furious?1.15:1)-e.vx)*Math.min(1,dt*4);
 }
 function titanFan(e){
   const x=e.x+e.w/2,y=e.y+29,aim=Math.atan2(player.y+player.h/2-y,player.x+player.w/2-x),enraged=e.phaseTwo,count=enraged?7:5;
@@ -389,12 +390,13 @@ function update(dt) {
   spawnTimer-=dt;
   if(!training&&spawnTimer<=0&&enemies.filter(e=>!e.boss&&e.hp>0).length<3&&stageKills<biomes[stage].goal){spawnTimer=spawn()?(biomes[stage].spawnSeconds||3.6):1.2;}
   if(!training&&stage===1&&!bossSpawned&&player.x>stage*LEVEL_LENGTH+3700){spawnMonster('sandjaw',stage*LEVEL_LENGTH+4200);bossSpawned=true;message('SANDJAW · THE RIDGE GUARDIAN',player.x,player.y-70,'#ffe0ad');}
-  if(!training&&stage===5&&!bossSpawned&&player.x>stage*LEVEL_LENGTH+3700){spawnMonster('warden',stage*LEVEL_LENGTH+4200);bossSpawned=true;message('THE MOONSTONE WARDEN',player.x,player.y-70,'#eed2ff');}
+  if(!training&&stage===5&&!bossSpawned&&stageKills>=biomes[stage].goal&&player.x>stage*LEVEL_LENGTH+3700){enemies=enemies.filter(e=>e.boss);spawnMonster('warden',stage*LEVEL_LENGTH+4200);bossSpawned=true;message('THE MOONSTONE WARDEN',player.x,player.y-70,'#eed2ff');}
   if(!training&&stage===biomes.length-1&&!bossSpawned&&player.x>stage*LEVEL_LENGTH+3700){spawnMonster('titan',stage*LEVEL_LENGTH+4200);bossSpawned=true;message('THE CINDER TITAN',player.x,player.y-70,'#ffd3a3');}
   for(const e of enemies) {
     if(e.hp<=0)continue;
     if(e.dummy){e.flash=Math.max(0,(e.flash||0)-dt);continue;}
     e.trapCooldown=Math.max(0,(e.trapCooldown||0)-dt);
+    e.hitLabelCooldown=Math.max(0,(e.hitLabelCooldown||0)-dt);
     const dir=Math.sign(player.x-e.x);
     if(e.flying)updateFlying(e,dt);
     else {if(e.type==='sandjaw')updateSandjaw(e,dt);else if(e.type==='warden')updateWarden(e,dt);else if(e.type==='titan')updateTitan(e,dt);else {const rush=e.charge&&Math.sin(time*1.8+e.phase)>.65?1.65:1;e.vx+=(dir*e.speed*rush-e.vx)*dt*3;if(e.ground&&(e.hop?Math.random()<dt*2.2:Math.random()<dt*.7))e.vy=e.hop?-445:-340;}physics(e,dt);if(e.type==='sandjaw'&&e.stomping&&e.ground){e.stomping=false;burst(e.x+e.w/2,e.y+e.h,'#e9c48d',14);}if(e.type==='titan'&&e.stomping&&e.ground){e.stomping=false;titanShockwave(e);}}
@@ -411,7 +413,9 @@ function update(dt) {
   }
   for(const b of enemyShots){
     const oldX=b.x,oldY=b.y;b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;
-    if(player.inv>0||b.life<=0)continue;
+    if(b.life<=0)continue;
+    if(platforms.some(p=>p.level===stage&&b.x+b.r>p.x&&b.x-b.r<p.x+p.w&&b.y+b.r>p.y&&b.y-b.r<p.y+22)){b.life=0;continue;}
+    if(player.inv>0)continue;
     const steps=Math.ceil(Math.hypot(b.x-oldX,b.y-oldY)/7);
     for(let i=0;i<=steps;i++){const f=i/Math.max(1,steps),x=oldX+(b.x-oldX)*f,y=oldY+(b.y-oldY)*f;
       if(x+b.r>player.x&&x-b.r<player.x+player.w&&y+b.r>player.y&&y-b.r<player.y+player.h){player.hp=Math.max(0,player.hp-b.damage);player.inv=.8;player.vy=-170;b.life=0;burst(x,y,'#ffd1ef',12);tone(88,.12);break;}}
@@ -441,7 +445,7 @@ function update(dt) {
       }
     }
     const gate=(stage+1)*LEVEL_LENGTH-160,open=completed[stage]||(stageKills>=biomes[stage].goal&&(!biomes[stage].boss||bossDefeated));
-    if(player.x>=gate-8){if(open){finishLevel();return;}player.x=gate-8;player.vx=0;if(Math.random()<dt)message(biomes[stage].boss&&!bossDefeated?`Defeat ${biomes[stage].bossName}!`:`Defeat ${Math.max(0,biomes[stage].goal-stageKills)} more monsters!`);}
+    if(player.x>=gate-8){if(open){finishLevel();return;}player.x=gate-8;player.vx=0;if(Math.random()<dt){const remaining=Math.max(0,biomes[stage].goal-stageKills);message(remaining?`Defeat ${remaining} more monsters!`:`Defeat ${biomes[stage].bossName}!`);}}
   }
   for(const s of sparks){s.x+=s.vx*dt;s.y+=s.vy*dt;s.vy+=600*dt;s.life-=dt;}sparks=sparks.filter(s=>s.life>0);
   for(const l of labels){l.y-=22*dt;l.life-=dt;}labels=labels.filter(l=>l.life>0);
@@ -639,6 +643,7 @@ function drawHUD() {
   if(training){rect(18,100,350,123,'#10272bdc');text('Try your new moves',32,122,17,'#c8efa7');text(`${lessons.move?'✓':'○'} A / D move   ${lessons.jump?'✓':'○'} Space jump twice`,32,148,13);text(`${lessons.melee?'✓':'○'} J melee    Find stronger gear later`,32,174,13);text('ENTER: open the map →',32,202,13,'#ffdb93');}
   else {rect(334,25,358,7,'#153139');rect(334,25,358*(player.x-stage*LEVEL_LENGTH)/LEVEL_LENGTH,7,biomes[region].grass);text('START',334,51,9,'#d0e1c4');text('MIDPOINT',493,51,9,'#eac49b');text('EXIT GATE',633,51,9,'#b8deef');}
   const currentBoss=enemies.find(e=>e.boss&&e.hp>0);
+  if(currentBoss){const name=currentBoss.type==='titan'?'CINDER TITAN':currentBoss.type==='sandjaw'?'SANDJAW':'WARDEN';rect(371,64,358,22,'#10272bea');rect(375,69,350,12,'#41505c');rect(375,69,350*Math.max(0,currentBoss.hp/currentBoss.max),12,currentBoss.type==='warden'?'#c990d6':currentBoss.type==='titan'?'#f2a46f':'#dcb375');text(`${name}  ${Math.ceil(currentBoss.hp)}/${currentBoss.max}`,385,79,10,'#fff2d4');}
   if(currentBoss?.tell>0){rect(406,91,292,31,currentBoss.type==='titan'?'#613a38e8':'#442a50e8');text(currentBoss.type==='titan'?(currentBoss.queuedAttack==='wave'?'TITAN: SHOCKWAVE · JUMP!':currentBoss.queuedAttack==='stomp'?'TITAN: LEAP · MOVE!':'TITAN: FIRE FAN'):currentBoss.type==='sandjaw'?(currentBoss.queuedAttack==='spray'?'SANDJAW: SPRAY · DODGE!':'SANDJAW: POUNCE · MOVE!'):(currentBoss.queuedAttack==='nova'?'WARDEN: NOVA · MOVE!':currentBoss.queuedAttack==='volley'?'WARDEN: CRYSTAL VOLLEY':'WARDEN: CHARGE'),426,112,15,'#ffe2fa');}
   // The active loadout bar contains only collected weapons assigned in Inventory.
   rect(0,603,W,97,'#0e2028');rect(0,603,W,2,'#58756b');
