@@ -13,7 +13,7 @@ const {createCanvas,loadImage}=require(process.argv[2]||'@napi-rs/canvas');
   const run=s=>vm.runInContext(s,box);run('Object.assign(sprites,loaded);start();draw()');
   const dir=path.join(__dirname,'previews');fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(path.join(dir,'practice.png'),canvas.toBuffer('image/png'));
   run('beginAdventure();unlockedStage=9');
-  for(const [index,name,monster] of [[0,'fernwood','slime'],[1,'amber-ridge','sandjaw'],[2,'mirewood','mushroom'],[3,'whisperwood','bat'],[4,'frostglass','golem'],[5,'moonstone','warden'],[6,'stormbreak','wolf'],[7,'obsidian','golem'],[8,'sunflare','scorpion'],[9,'ember-citadel','titan']]){
+  for(const [index,name,monster] of [[0,'fernwood','bramble'],[1,'amber-ridge','sandjaw'],[2,'mirewood','mushroom'],[3,'whisperwood','bat'],[4,'frostglass','golem'],[5,'moonstone','warden'],[6,'stormbreak','stormwing'],[7,'obsidian','golem'],[8,'sunflare','embermoth'],[9,'ember-citadel','titan']]){
     const boss=[1,5,9].includes(index),offset=boss?3900:1800;
     run(`enterLevel(${index});player.x=${index}*LEVEL_LENGTH+${offset};player.y=528;camera=${index}*LEVEL_LENGTH+${offset-400};spawnMonster('${monster}',player.x+300);draw()`);
     fs.writeFileSync(path.join(dir,name+'.png'),canvas.toBuffer('image/png'));
@@ -24,8 +24,8 @@ const {createCanvas,loadImage}=require(process.argv[2]||'@napi-rs/canvas');
     sctx.drawImage(canvas,340,455,180,125,col*275,row*210+25,270,187);sctx.fillStyle='#fff';sctx.font='14px sans-serif';sctx.fillText(['Sword','Axe','Hammer'][row]+' '+[12,38,62,82][col]+'%',col*275+12,row*210+20);
   }
   fs.writeFileSync(path.join(dir,'melee-animation.png'),sheet.toBuffer('image/png'));
-  const names=['mushroom','wolf','beetle','scorpion','wisp','golem','warden','thorns','spikes','crystal-trap'];
-  const roster=createCanvas(900,490),rctx=roster.getContext('2d');rctx.fillStyle='#162c36';rctx.fillRect(0,0,900,490);
+  const names=['mushroom','wolf','beetle','scorpion','wisp','golem','warden','bramble','stormwing','embermoth','thorns','spikes','crystal-trap'];
+  const roster=createCanvas(900,700),rctx=roster.getContext('2d');rctx.fillStyle='#162c36';rctx.fillRect(0,0,900,700);
   rctx.fillStyle='#e8f3e7';rctx.font='bold 26px sans-serif';rctx.fillText('Wildlands: new creatures and hazards',28,42);
   for(let i=0;i<names.length;i++){const name=names[i],x=25+(i%5)*175,y=68+Math.floor(i/5)*205;
     rctx.fillStyle='#28434b';rctx.fillRect(x,y,160,185);rctx.drawImage(box.loaded[name],0,0,64,48,x+15,y+20,130,98);

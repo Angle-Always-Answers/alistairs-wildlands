@@ -3,6 +3,8 @@
   'use strict';
   const STORAGE='alistairs-wildlands-editor-v1',VERSION=4;
   const panel=document.querySelector('#level-editor'),frameElement=document.querySelector('.frame');
+  panel.querySelector('.editor-head').insertAdjacentHTML('afterend',`<div class="editor-level-jump"><strong>Playtest any level</strong><label>Jump to <select id="editor-jump-level">${biomes.map((b,i)=>`<option value="${i}">${i+1}. ${b.name}</option>`).join('')}</select></label><p>Jumping resets the level view and enemies; your saved edits stay intact.</p></div>`);
+  document.querySelector('#editor-goal').parentElement.firstChild.textContent='Pursuit-free hunt target ';
   const $=id=>document.querySelector('#'+id),clone=value=>JSON.parse(JSON.stringify(value));
   const bossFields=document.createElement('div');bossFields.id='editor-boss-fields';bossFields.innerHTML='<label>Boss health <input id="editor-boss-health" type="range" min="50" max="250" step="10"><output id="editor-boss-health-value"></output></label><label>Boss damage <input id="editor-boss-damage" type="range" min="50" max="250" step="10"><output id="editor-boss-damage-value"></output></label>';
   $('editor-monster').parentElement.before(bossFields);
@@ -100,6 +102,7 @@
   function refresh(){
     if(!draft)return;
     $('editor-level-name').textContent=`${stage+1}. ${biomes[stage].name}`;
+    $('editor-jump-level').value=String(stage);
     const entry=selectedEntry(),item=entry?.item,canY=entry&&['platforms','chests','loot'].includes(entry.kind);
     $('editor-selection').textContent=entry?`${entry.kind==='loot'?item.type:entry.kind.replace(/s$/,'')} selected`:'No object selected';
     $('editor-x').disabled=!entry;$('editor-x').value=item?Math.round(item.x-stage*LEVEL_LENGTH):'';
@@ -112,7 +115,7 @@
     const monster=$('editor-monster'),value=monster.value;monster.replaceChildren();for(const name of [...biomes[stage].monsters,...(biomes[stage].boss?[stage===1?'sandjaw':stage===5?'warden':'titan']:[])]){const option=document.createElement('option');option.value=name;option.textContent=name.toUpperCase();monster.append(option);}if([...monster.options].some(o=>o.value===value))monster.value=value;
   }
   function commit(before){undo.push(before);if(undo.length>25)undo.shift();applyStage(stage,draft,before);edits[stage]=clone(draft);status(save()?'Saved here. Resume to test the change.':'Change applied, but browser storage is unavailable; export it now.');refresh();}
-  function mutate(fn){const before=clone(draft);fn();commit(before);}
+  function mutate(fn){if(state!=='editor'||!draft)return;const before=clone(draft);fn();commit(before);}
   function open(){
     if(state!=='play'||training||stage<0){const toggle=$('editor-toggle');toggle.textContent='Enter a level first';setTimeout(()=>toggle.textContent='Edit level (F2)',1800);return;}
     state='editor';keys.clear();mouse.down=false;player.attack=null;activeAimPointer=null;mobileAim=null;canvasTouch=null;touchGestures.clear();
@@ -121,6 +124,7 @@
   function close(){if(state!=='editor')return;drag=null;draft=null;selected=null;state='play';panel.hidden=true;frameElement.classList.remove('editor-active');keys.clear();canvas.focus();}
   window.toggleLevelEditor=()=>state==='editor'?close():open();
   $('editor-toggle').onclick=window.toggleLevelEditor;$('editor-close').onclick=close;$('editor-resume').onclick=close;
+  $('editor-jump-level').onchange=()=>{const destination=Number($('editor-jump-level').value);if(state!=='editor'||!Number.isInteger(destination)||destination<0||destination>=biomes.length)return;close();pursuit=[];enterLevel(destination,true);open();status(`Testing ${biomes[destination].name}. Exit the editor to play this level.`);};
   panel.querySelectorAll('[data-editor-tool]').forEach(button=>button.onclick=()=>setTool(button.dataset.editorTool));
   $('editor-weapon').replaceChildren(...weapons.map((weapon,index)=>{const option=document.createElement('option');option.value=String(index);option.textContent=weapon.name;return option;}));
   function screenPoint(event){const rect=canvas.getBoundingClientRect();return {x:camera+(event.clientX-rect.left)*W/rect.width,y:(event.clientY-rect.top)*H/rect.height};}
