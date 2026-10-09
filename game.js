@@ -54,7 +54,7 @@ const platformLayouts=[originalLayouts[0],originalLayouts[1],originalLayouts[3],
 const platforms = platformLayouts.flatMap((layout,level)=>layout.map(([x,y,w])=>({x:x+level*LEVEL_LENGTH,y,w,level})));
 const springPads=[[1970,3650],[1750,3300],[1880,3900],[1170,3180],[1320,3520],[1220,2900],[1620,3660],[1490,3310],[1360,3480],[1740,3610]].flatMap((pads,i)=>pads.map(x=>i*LEVEL_LENGTH+x));
 const chestSpots=[[[790,350],[2190,230]],[[1110,280],[2470,245]],[[1700,340],[3620,365]],[[1080,225],[2730,175]],[[1340,180],[3670,180]],[[1430,190],[3820,200]],[[920,230],[3080,205]],[[1180,325],[3770,205]],[[1440,190],[3480,275]],[[1890,215],[4060,340]]].flatMap((spots,i)=>spots.map(([x,y])=>({x:i*LEVEL_LENGTH+x,y})));
-const traps=[['thorns',[1230,2590,3920]],['spikes',[1500,2880,4050]],['thorns',[950,2600,4080]],['thorns',[1200,2750,3900]],['crystal-trap',[800,2380,4000]],['crystal-trap',[900,2220,3550,4250]],['spikes',[1150,2530,3990]],['crystal-trap',[1250,2790,4110]],['spikes',[990,2430,4070]],['spikes',[1130,2660,3980]]].flatMap(([kind,spots],i)=>spots.map(x=>({x:i*LEVEL_LENGTH+x,kind,w:56,h:25})));
+const traps=[['thorns',[1230,2590,3920]],['spikes',[1500,2880,4050]],['thorns',[950,2600,4080]],['thorns',[1200,2750,3900]],['crystal-trap',[800,2380,4000]],['crystal-trap',[900,2220,3550,3860,4050,4250,4500]],['spikes',[1150,2530,3990]],['crystal-trap',[1250,2790,4110]],['spikes',[990,2430,4070]],['spikes',[1130,2660,3980]]].flatMap(([kind,spots],i)=>spots.map(x=>({x:i*LEVEL_LENGTH+x,kind,w:56,h:25})));
 const monsterStats={
   slime:{hp:44,w:34,h:28,speed:68,damage:8,color:'#a0d65a'},
   bat:{hp:40,w:34,h:26,speed:72,damage:8,flying:true,color:'#d394ef'},
@@ -311,8 +311,9 @@ function updateWarden(e,dt) {
   const furious=e.hp<e.max*.5,dx=player.x+player.w/2-(e.x+e.w/2);
   if(furious&&!e.phaseTwo){e.phaseTwo=true;e.bossCooldown=.8;message('WARDEN ENRAGED · WATCH FOR NOVA!',e.x,e.y-82,'#ffe0f6');burst(e.x+e.w/2,e.y+e.h/2,'#f4b4ed',30);}
   e.leapCooldown=Math.max(0,e.leapCooldown-dt);
-  if(e.tell>0){e.tell=Math.max(0,e.tell-dt);e.vx*=Math.max(0,1-dt*8);if(e.tell===0){if(e.queuedAttack==='volley')wardenVolley(e);else if(e.queuedAttack==='nova')wardenNova(e);else e.dash=.4;e.queuedAttack=null;e.bossCooldown=furious?1.8:2.4;}return;}
-  if(e.dash>0){e.dash=Math.max(0,e.dash-dt);e.vx=e.dashDir*(furious?460:380);return;}
+  if(e.tell>0){e.tell=Math.max(0,e.tell-dt);e.vx*=Math.max(0,1-dt*8);if(e.tell===0){if(e.queuedAttack==='volley')wardenVolley(e);else if(e.queuedAttack==='nova')wardenNova(e);else e.dash=.32;e.queuedAttack=null;e.bossCooldown=furious?1.8:2.4;}return;}
+  if(e.dash>0){e.dash=Math.max(0,e.dash-dt);e.vx=e.dash>0?e.dashDir*(furious?400:340):0;if(e.dash===0)e.recovery=furious?.65:.8;return;}
+  if(e.recovery>0){e.recovery=Math.max(0,e.recovery-dt);e.vx=0;return;}
   e.bossCooldown=Math.max(0,e.bossCooldown-dt);
   if(e.ground&&e.leapCooldown===0&&player.y+player.h<e.y+25){e.vy=furious?-1010:-940;e.ground=false;e.leapCooldown=furious?3.2:4;burst(e.x+e.w/2,e.y+e.h,'#bcecff',10);}
   if(e.bossCooldown===0&&Math.abs(dx)<1050){e.queuedAttack=furious&&e.attackIndex%3===2?'nova':Math.abs(dx)>270||player.y<e.y-55||e.attackIndex%2===0?'volley':'dash';e.attackIndex++;e.tell=e.queuedAttack==='nova'?1.25:e.queuedAttack==='volley'?.95:.8;e.dashDir=Math.sign(dx)||1;message(e.queuedAttack==='nova'?'CRYSTAL NOVA · MOVE!':e.queuedAttack==='volley'?'CRYSTAL VOLLEY!':'WARDEN CHARGE!',e.x,e.y-65,'#ffc5f7');}
@@ -390,7 +391,7 @@ function update(dt) {
   spawnTimer-=dt;
   if(!training&&spawnTimer<=0&&enemies.filter(e=>!e.boss&&e.hp>0).length<3&&stageKills<biomes[stage].goal){spawnTimer=spawn()?(biomes[stage].spawnSeconds||3.6):1.2;}
   if(!training&&stage===1&&!bossSpawned&&player.x>stage*LEVEL_LENGTH+3700){spawnMonster('sandjaw',stage*LEVEL_LENGTH+4200);bossSpawned=true;message('SANDJAW · THE RIDGE GUARDIAN',player.x,player.y-70,'#ffe0ad');}
-  if(!training&&stage===5&&!bossSpawned&&stageKills>=biomes[stage].goal&&player.x>stage*LEVEL_LENGTH+3700){enemies=enemies.filter(e=>e.boss);spawnMonster('warden',stage*LEVEL_LENGTH+4200);bossSpawned=true;message('THE MOONSTONE WARDEN',player.x,player.y-70,'#eed2ff');}
+  if(!training&&stage===5&&!bossSpawned&&stageKills>=biomes[stage].goal&&player.x>stage*LEVEL_LENGTH+3700){enemies=enemies.filter(e=>e.boss);spawnMonster('warden',stage*LEVEL_LENGTH+4200);bossSpawned=true;message('LURE THE WARDEN INTO CRYSTAL TRAPS!',player.x,player.y-70,'#eed2ff');}
   if(!training&&stage===biomes.length-1&&!bossSpawned&&player.x>stage*LEVEL_LENGTH+3700){spawnMonster('titan',stage*LEVEL_LENGTH+4200);bossSpawned=true;message('THE CINDER TITAN',player.x,player.y-70,'#ffd3a3');}
   for(const e of enemies) {
     if(e.hp<=0)continue;
@@ -400,7 +401,7 @@ function update(dt) {
     const dir=Math.sign(player.x-e.x);
     if(e.flying)updateFlying(e,dt);
     else {if(e.type==='sandjaw')updateSandjaw(e,dt);else if(e.type==='warden')updateWarden(e,dt);else if(e.type==='titan')updateTitan(e,dt);else {const rush=e.charge&&Math.sin(time*1.8+e.phase)>.65?1.65:1;e.vx+=(dir*e.speed*rush-e.vx)*dt*3;if(e.ground&&(e.hop?Math.random()<dt*2.2:Math.random()<dt*.7))e.vy=e.hop?-445:-340;}physics(e,dt);if(e.type==='sandjaw'&&e.stomping&&e.ground){e.stomping=false;burst(e.x+e.w/2,e.y+e.h,'#e9c48d',14);}if(e.type==='titan'&&e.stomping&&e.ground){e.stomping=false;titanShockwave(e);}}
-    if(overlap(player,e)&&player.inv<=0){player.hp=Math.max(0,player.hp-e.damage);player.inv=1;player.vy=-220;burst(player.x,player.y,'#ffb195');tone(80,.13);}
+    if(e.type!=='warden'&&overlap(player,e)&&player.inv<=0){player.hp=Math.max(0,player.hp-e.damage);player.inv=1;player.vy=-220;burst(player.x,player.y,'#ffb195');tone(80,.13);}
   }
   for(const b of bullets) {
     const ox=b.x,oy=b.y;b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;
@@ -440,7 +441,7 @@ function update(dt) {
       if(player.ground&&player.y+player.h>=FLOOR-1&&player.inv<=0&&Math.abs(player.x+12-(t.x+28))<31){player.hp=Math.max(0,player.hp-11);player.inv=.9;player.vy=-260;burst(player.x,player.y+40,'#f7b2a3',8);message('TRAP!',player.x,player.y-20,'#ffd3a8');}
       for(const e of enemies){if(e.hp<=0||e.dummy||!e.ground||e.y+e.h<FLOOR-1||e.trapCooldown>0)continue;
         if(e.x+e.w<=t.x||e.x>=t.x+t.w)continue;
-        e.trapCooldown=.9;hit(e,e.boss?25:35);if(e.hp>0){e.vx+=(e.x+e.w/2<t.x+t.w/2?-1:1)*(e.boss?95:185);e.vy=-100;}
+        e.trapCooldown=.9;hit(e,e.type==='warden'?85:e.boss?25:35);if(e.hp>0){e.vx+=(e.x+e.w/2<t.x+t.w/2?-1:1)*(e.boss?95:185);e.vy=-100;}
         burst(e.x+e.w/2,FLOOR-20,'#f7b2a3',8);message(e.boss?'BOSS HIT BY TRAP!':'TRAP HIT!',e.x,e.y-16,'#ffd3a8');
       }
     }
